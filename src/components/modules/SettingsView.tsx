@@ -323,7 +323,8 @@ export function SettingsView({
       {/* Profile card */}
       <section className="freyr-panel p-4">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => avatarInput.current?.click()} className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border border-outline bg-inset text-[18px] font-semibold text-ink-secondary" aria-label="Change profile picture">{avatar ? <img src={avatar} alt="Profile" className="size-full object-cover" /> : initials || "F"}<span className="absolute inset-0 grid place-items-center bg-black/55 text-[9px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">EDIT</span></button>\n          <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatar(e.target.files?.[0])} />
+          <button type="button" onClick={() => avatarInput.current?.click()} className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border border-outline bg-inset text-[18px] font-semibold text-ink-secondary" aria-label="Change profile picture">{avatar ? <img src={avatar} alt="Profile" className="size-full object-cover" /> : initials || "F"}<span className="absolute inset-0 grid place-items-center bg-black/55 text-[9px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">EDIT</span></button>
+          <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatar(e.target.files?.[0])} />
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold text-ink">{data.user.name}</div>
             <div className="truncate text-[11.5px] text-ink-secondary">{data.user.email}</div>
