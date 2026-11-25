@@ -9,6 +9,7 @@ import {
   type DataStatus,
 } from "../market-data";
 import { analyzeLiquidityAndStructure } from "./liquidity";
+import { calculateAdaptiveTakeProfit } from "./adaptive-tp";
 import { runModFlowAnalysis } from "./modflow";
 import type { AnalysisScenario, ChartAnalysisSnapshot, EngineScoreItem } from "@/db/schema";
 
@@ -115,7 +116,7 @@ export async function runMultiEngineAnalysis(params: {
   const inst = getInstrument(params.symbol ?? "XAUUSD");
   const symbol = inst.symbol;
   const dec = inst.decimals;
-  const threshold = Math.min(90, Math.max(45, params.confidenceThreshold ?? 62));
+  const threshold = Math.min(95, Math.max(80, params.confidenceThreshold ?? 80));
   const minRr = Math.max(1.2, params.minRiskReward ?? 1.8);
 
   // Run interconnected live engines in parallel
@@ -392,19 +393,24 @@ export async function runMultiEngineAnalysis(params: {
 
   const riskDist = Math.max(Math.abs(entryRaw - slRaw), m15Atr * 0.8);
 
-  // Publish one target: a favorable liquidity pool, or the established risk multiple.
+  // Adaptive TP: momentum expands the target, volatility adjusts distance conservatively,
+  // and a valid opposing liquidity pool can cap the target. Exactly one TP is produced.
   const poolTarget = isLong ? liqM15.nearestBsl?.price : liqM15.nearestSsl?.price;
-  const targetDistance = poolTarget === undefined ? 0 : (poolTarget - entryRaw) * (isLong ? 1 : -1);
-  const targetRaw =
-    poolTarget && targetDistance >= riskDist * 2.1 && targetDistance <= riskDist * 5.0
-      ? poolTarget
-      : isLong
-        ? entryRaw + riskDist * 2.8
-        : entryRaw - riskDist * 2.8;
-
   const entryPrice = roundPrice(entryRaw, dec);
   const stopLoss = roundPrice(slRaw, dec);
-  const takeProfit = roundPrice(targetRaw, dec);
+  const adaptiveTarget = calculateAdaptiveTakeProfit({
+    side: isLong ? "BUY" : "SELL",
+    entry: entryPrice,
+    stopLoss,
+    atr: m15Atr,
+    momentumScore: Math.abs(netDirectional),
+    volatilityPct: (m15Atr / currentPrice) * 100,
+    opposingLiquidity: poolTarget,
+    minRiskReward: minRr,
+  });
+  const takeProfit = adaptiveTarget ? roundPrice(adaptiveTarget.takeProfit, dec) : roundPrice(
+    isLong ? entryPrice + Math.max(m15Atr * 2.2, riskDist * minRr) : entryPrice - Math.max(m15Atr * 2.2, riskDist * minRr), dec
+  );
   const actualRisk = Math.abs(entryPrice - stopLoss);
   const riskReward = actualRisk > 0 ? Number((Math.abs(takeProfit - entryPrice) / actualRisk).toFixed(2)) : 0;
 
