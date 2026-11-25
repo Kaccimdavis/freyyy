@@ -155,7 +155,7 @@ input[type="range"].freyr-range, input[type="checkbox"] { accent-color: var(--fr
 .freyr-icon-button { position: relative; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid transparent; border-radius: 12px; color: var(--freyr-muted); cursor: pointer; }
 .freyr-icon-button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--freyr-accent) 60%, transparent); color: var(--freyr-ink); background: var(--freyr-elevated); }
 .freyr-icon-button:disabled { color: var(--freyr-quiet); }
-.freyr-dock { inset-inline: var(--freyr-gutter); bottom: max(6px, calc(env(safe-area-inset-bottom) + 2px)); }
+.freyr-dock { inset-inline: var(--freyr-gutter); bottom: env(safe-area-inset-bottom, 0px); }
 .freyr-dock-surface { box-shadow: 0 8px 25px var(--freyr-shadow); }
 .freyr-dock-item { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 48px; border-radius: 16px; color: var(--freyr-muted); font-size: 11.5px; line-height: 1; cursor: pointer; }
 .freyr-dock-item:hover { color: var(--freyr-ink); }
