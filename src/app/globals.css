@@ -260,3 +260,69 @@ input[type="range"].freyr-range, input[type="checkbox"] { accent-color: var(--fr
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 @media (prefers-reduced-transparency: reduce) { .liquid-glass, .liquid-glass-subtle { background: var(--freyr-surface); backdrop-filter: none; } }
+
+/* Refined interaction motion: restrained feedback, never animate live market values. */
+@keyframes freyr-dialog-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes freyr-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes freyr-indicator-enter {
+  from { opacity: 0; transform: scaleX(.65); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .freyr-panel,
+  .freyr-card,
+  .news-card {
+    transition:
+      border-color .2s ease,
+      background-color .2s ease,
+      box-shadow .2s ease,
+      transform .2s cubic-bezier(.2, .7, .2, 1);
+  }
+  .freyr-card:hover,
+  .news-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--freyr-accent) 32%, var(--freyr-line));
+  }
+  .freyr-history-row,
+  .freyr-analysis-tile,
+  .freyr-notice button,
+  .freyr-segment {
+    transition:
+      color .16s ease,
+      background-color .16s ease,
+      border-color .16s ease,
+      transform .16s ease;
+  }
+  .freyr-history-row:hover { transform: translateX(2px); }
+  .freyr-notice button:hover { transform: translateY(-1px); }
+}
+
+:where(button, a, input, select, textarea, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--freyr-accent);
+  outline-offset: 3px;
+}
+.freyr-dialog[open] {
+  animation: freyr-dialog-enter .24s cubic-bezier(.2, .75, .25, 1) both;
+}
+.freyr-dialog[open]::backdrop {
+  animation: freyr-backdrop-enter .2s ease-out both;
+}
+.freyr-dialog[open] .freyr-dialog-inner {
+  animation: freyr-dialog-enter .24s cubic-bezier(.2, .75, .25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .freyr-dialog[open],
+  .freyr-dialog[open]::backdrop,
+  .freyr-dialog[open] .freyr-dialog-inner {
+    animation: none !important;
+  }
+}
+
