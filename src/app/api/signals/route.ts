@@ -60,11 +60,11 @@ const RequestSchema = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("manual"), symbol: SymbolSchema.default("XAUUSD"), direction: z.enum(["BUY", "SELL"]),
     entryPrice: z.number().positive(), stopLoss: z.number().positive(), takeProfit: z.number().positive(),
-    confidence: z.number().int().min(30).max(95), timeframe: FrameSchema.default("15m"), strategyName: z.string().trim().min(2).max(120),
+    confidence: z.number().int().min(80).max(95), timeframe: FrameSchema.default("15m"), strategyName: z.string().trim().min(2).max(120),
     marketConditions: z.string().trim().min(4).max(500), confirmations: z.array(z.string().trim().min(2).max(200)).min(2).max(10),
     invalidationRule: z.string().trim().min(4).max(300), initialStatus: z.enum(["PENDING", "ACTIVE"]).default("PENDING"), strategyId: z.number().int().positive().optional(),
   }).strict(),
-  z.object({ mode: z.literal("ai"), symbol: SymbolSchema.default("XAUUSD"), timeframe: FrameSchema.default("15m"), confidenceThreshold: z.number().min(50).max(90).default(62), strategyId: z.number().int().positive().optional() }),
+  z.object({ mode: z.literal("ai"), symbol: SymbolSchema.default("XAUUSD"), timeframe: FrameSchema.default("15m"), confidenceThreshold: z.number().min(80).max(95).default(80), strategyId: z.number().int().positive().optional() }),
 ]);
 
 function gateResponse(gate: { hasOpen: boolean; remainingMs: number; nextAvailableAt: string | null }) {
@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
         dataSource: "User-published", dataStatus: "MANUAL", status: input.initialStatus,
       };
     }
+    if (candidate.confidence < 80) return NextResponse.json({ error: "Signal confidence is below the mandatory 80% publication threshold. No signal was published.", confidence: candidate.confidence, requiredConfidence: 80 }, { status: 422 });
     if (!validSignalLevels(candidate.direction === "BUY" ? "BUY" : "SELL", candidate.entryPrice, candidate.stopLoss, candidate.takeProfit) || !Number.isFinite(candidate.riskReward)) {
       return NextResponse.json({ error: "Stop loss and take profit must be on opposite sides of the entry." }, { status: input.mode === "ai" ? 422 : 400 });
     }
