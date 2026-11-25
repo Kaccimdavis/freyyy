@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
@@ -56,6 +56,7 @@ interface SettingsPayload {
 
 const TIMEZONES = [
   "UTC",
+  "Africa/Kampala",
   "America/New_York",
   "America/Chicago",
   "America/Los_Angeles",
@@ -159,6 +160,25 @@ export function SettingsView({
   const [broker, setBroker] = useState<BrokerConfig | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
   const [prefBusy, setPrefBusy] = useState(false);
+  const [avatar, setAvatar] = useState("");
+  const avatarInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try { setAvatar(window.localStorage.getItem("freyr-profile-avatar") ?? ""); } catch { /* storage unavailable */ }
+  }, []);
+
+  const handleAvatar = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setErr("Choose an image file."); return; }
+    if (file.size > 2 * 1024 * 1024) { setErr("Profile images must be 2 MB or smaller."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      try { window.localStorage.setItem("freyr-profile-avatar", value); setAvatar(value); setMsg("Profile picture updated."); }
+      catch { setErr("Couldn’t save this image. Choose a smaller image."); }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [authMode, setAuthMode] = useState<"password" | "login" | "register">("password");
   const [curPw, setCurPw] = useState("");
@@ -303,7 +323,7 @@ export function SettingsView({
       {/* Profile card */}
       <section className="freyr-panel p-4">
         <div className="flex items-center gap-3">
-          <div className="grid size-14 shrink-0 place-items-center rounded-full border border-outline bg-inset text-[18px] font-semibold text-ink-secondary" aria-hidden="true">{initials || "F"}</div>
+          <button type="button" onClick={() => avatarInput.current?.click()} className="group relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-full border border-outline bg-inset text-[18px] font-semibold text-ink-secondary" aria-label="Change profile picture">{avatar ? <img src={avatar} alt="Profile" className="size-full object-cover" /> : initials || "F"}<span className="absolute inset-0 grid place-items-center bg-black/55 text-[9px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">EDIT</span></button>\n          <input ref={avatarInput} type="file" accept="image/*" className="hidden" onChange={(e) => handleAvatar(e.target.files?.[0])} />
           <div className="min-w-0">
             <div className="truncate text-[15px] font-bold text-ink">{data.user.name}</div>
             <div className="truncate text-[11.5px] text-ink-secondary">{data.user.email}</div>
@@ -629,7 +649,7 @@ export function SettingsView({
         ) : (
           <button
             type="button"
-            onClick={() => { setAuthMode("login"); setOpen("security"); window.scrollTo({ top: 0 }); }}
+            onClick={() => { setAuthMode("login"); setOpen("edit"); window.scrollTo({ top: 0 }); }}
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-ink/[0.09] bg-ink/[0.04] px-4 py-3 text-[12px] font-semibold text-ink transition-colors hover:bg-ink/[0.07] cursor-pointer"
           >
             <KeyRound className="h-4 w-4" /> Sign in to your account
