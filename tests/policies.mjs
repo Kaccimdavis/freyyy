@@ -62,3 +62,21 @@ test("news outcomes use the completed closes at both boundaries", () => {
   bars.set(end - REACTION_BAR_MS, { close: 3701 });
   assert.equal(scoreNewsReaction(bars, release, "BUY", end).outcome, "FLAT");
 });
+
+import { calculateAdaptiveTakeProfit } from "../src/lib/engines/adaptive-tp.ts";
+
+test("adaptive TP expands with momentum while respecting minimum R and liquidity", () => {
+  const weak = calculateAdaptiveTakeProfit({ side: "BUY", entry: 4000, stopLoss: 3990, atr: 10, momentumScore: 30, volatilityPct: 0.25, minRiskReward: 1.5 });
+  const strong = calculateAdaptiveTakeProfit({ side: "BUY", entry: 4000, stopLoss: 3990, atr: 10, momentumScore: 90, volatilityPct: 0.25, minRiskReward: 1.5 });
+  assert.ok(weak && strong);
+  assert.ok(strong.takeProfit > weak.takeProfit);
+  assert.ok(weak.riskReward >= 1.5);
+  const capped = calculateAdaptiveTakeProfit({ side: "BUY", entry: 4000, stopLoss: 3990, atr: 10, momentumScore: 90, volatilityPct: 0.25, opposingLiquidity: 4040, minRiskReward: 1.5 });
+  assert.equal(capped?.takeProfit, 4040);
+  assert.equal(capped?.constrainedByLiquidity, true);
+});
+test("adaptive TP validates direction and supports sell targets", () => {
+  const sell = calculateAdaptiveTakeProfit({ side: "SELL", entry: 4000, stopLoss: 4010, atr: 10, momentumScore: 80, volatilityPct: 0.3, minRiskReward: 1.5 });
+  assert.ok(sell && sell.takeProfit < 4000);
+  assert.equal(calculateAdaptiveTakeProfit({ side: "BUY", entry: 4000, stopLoss: 4010, atr: 10, momentumScore: 80, volatilityPct: 0.3 }), null);
+});
