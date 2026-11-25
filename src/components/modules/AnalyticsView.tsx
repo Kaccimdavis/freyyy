@@ -100,9 +100,9 @@ export function AnalyticsView({ timezone, navigation, onJournal }: { timezone: s
   return <div className="freyr-primary-view">
     <PageHero title="History" description="Journal performance by month, week or custom range." actions={navigation} />
     <SegmentedControl options={PERIODS} value={mode} onChange={(value) => { setMode(value); setShowAll(false); }} ariaLabel="History filter mode" />
-    {mode === "custom" ? <div className="grid grid-cols-2 gap-2.5">
-      <label className="min-w-0"><span className="freyr-label">From</span><input type="date" value={from} max={to || undefined} onChange={(event) => { setFrom(event.target.value); setShowAll(false); }} className={INPUT_CLS} /></label>
-      <label className="min-w-0"><span className="freyr-label">To</span><input type="date" value={to} min={from || undefined} onChange={(event) => { setTo(event.target.value); setShowAll(false); }} className={INPUT_CLS} /></label>
+    {mode === "custom" ? <div className="grid grid-cols-2 gap-4">
+      <label className="min-w-0"><span className="freyr-label">From</span><input type="date" value={from} max={to || undefined} onChange={(event) => { setFrom(event.target.value); setShowAll(false); }} className={`${INPUT_CLS} block w-full min-w-0`} /></label>
+      <label className="min-w-0"><span className="freyr-label">To</span><input type="date" value={to} min={from || undefined} onChange={(event) => { setTo(event.target.value); setShowAll(false); }} className={`${INPUT_CLS} block w-full min-w-0`} /></label>
     </div> : <label className="block">
       <span className="freyr-label">{mode === "months" ? "Select month" : "Select week"}</span>
       <span className="relative block"><select aria-label={mode === "months" ? "Select month" : "Select week"} className="freyr-reference-select font-semibold" value={mode === "months" ? monthValue : weekValue} onChange={(event) => { (mode === "months" ? setMonth : setWeek)(event.target.value); setShowAll(false); }}>
