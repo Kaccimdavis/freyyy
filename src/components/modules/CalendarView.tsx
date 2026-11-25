@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, RefreshCw, Share2 } from "lucide-react";
-import { isCalendarRelease, type EconomicEvent } from "@/lib/market-data";
+import { type EconomicEvent } from "@/lib/market-data";
 import { Chip, DataStatusBadge, DirectionBadge, EmptyState, ErrorBanner, PageHero, PanelSkeleton, SectionLabel, SegmentedControl, cn, formatClock, formatDateTime, formatDayHeading, formatPct } from "@/components/ui/primitives";
 
 type Tab = "predictions" | "calendar" | "history";
@@ -98,7 +98,7 @@ export function CalendarView({ timezone, navigation }: { timezone: string; navig
   const predictions = useMemo(() => groupByDay(data.predictions?.predictions ?? [], (item) => item.releaseAt, timezone), [data.predictions, timezone]);
   const history = useMemo(() => groupByDay(data.history?.history ?? [], (item) => item.releaseAt, timezone), [data.history, timezone]);
   const calendar: CalendarData | undefined = data.calendar?.events ? { events: data.calendar.events, status: data.calendar.status ?? "UNAVAILABLE", fetchedAt: data.calendar.fetchedAt ?? "", error: data.calendar.error } : undefined;
-  const scheduleEvents = useMemo(() => (calendar?.events ?? []).filter((event) => isCalendarRelease(event.impact)), [calendar]);
+  const scheduleEvents = useMemo(() => (calendar?.events ?? []).filter((event) => event.impact === "High"), [calendar]);
   const schedule = groupByDay(scheduleEvents, (item) => item.timestamp, timezone);
   const uninitialized = loading && !data[tab];
 
@@ -118,7 +118,7 @@ export function CalendarView({ timezone, navigation }: { timezone: string; navig
       <PageHero title="News" description="Gold calls and market-moving releases." actions={navigation} />
       <SegmentedControl options={SECTIONS} value={tab} onChange={(value) => { setTab(value); setNotice(""); }} ariaLabel="News sections" />
       <div className="freyr-section-caption">
-        <SectionLabel>{tab === "predictions" ? "XAU/USD · Gold calls" : tab === "calendar" ? "High, medium & bank holidays" : "XAU/USD · Prediction history"}</SectionLabel>
+        <SectionLabel>{tab === "predictions" ? "XAU/USD · Gold calls" : tab === "calendar" ? "High-impact releases" : "XAU/USD · Prediction history"}</SectionLabel>
         <div className="flex shrink-0 items-center gap-0.5">
           {tab === "predictions" && <button type="button" className="freyr-icon-button" title="Share News" aria-label="Share News" onClick={() => void share()}><Share2 size={17} aria-hidden="true" /></button>}
           {tab === "calendar" && calendar && <DataStatusBadge status={calendar.status} />}
@@ -149,7 +149,7 @@ export function CalendarView({ timezone, navigation }: { timezone: string; navig
               <span>Calendar feed is temporarily unavailable.</span>
               <button type="button" onClick={refresh}>Retry</button>
             </div>
-          ) : <EmptyState title="No releases scheduled" description="No high-impact, medium-impact or bank holiday releases in this week’s feed." />) : schedule.map(([day, list]) => (
+          ) : <EmptyState title="No releases scheduled" description="No high-impact releases scheduled in this week’s feed." />) : schedule.map(([day, list]) => (
             <section key={day} className="space-y-2.5">
               <SectionLabel>{day}</SectionLabel>
               {list.map((event) => {
