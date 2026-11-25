@@ -12,6 +12,8 @@ export const viewport: Viewport = {
   themeColor: "#0b0b0c",
   colorScheme: "dark light",
   viewportFit: "cover",
+  maximumScale: 1,
+  userScalable: false,
 };
 
 const APPEARANCE_SCRIPT = `(function(){try{var m=localStorage.getItem('freyr-appearance')||'dark';var r=m==='system'?(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r;}catch(e){}})();`;
