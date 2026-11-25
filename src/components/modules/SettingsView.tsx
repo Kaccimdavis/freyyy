@@ -328,24 +328,14 @@ export function SettingsView({
             <div className="truncate text-[15px] font-bold text-ink">{data.user.name}</div>
             <div className="truncate text-[11.5px] text-ink-secondary">{data.user.email}</div>
             <div className="mt-1 flex flex-wrap gap-1">
-              <Chip tone="accent">{data.user.subscriptionTier}</Chip>
               <Chip tone="neutral">{data.isAuthenticated ? "Signed in" : "Desk workspace"}</Chip>
             </div>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setOpen(open === "edit" ? null : "edit")}>
-            <Pencil className="h-3.5 w-3.5" /> Edit details
+        <div className="mt-3">
+          <Button variant="secondary" size="sm" className="w-full" onClick={() => { setAuthMode(data.isAuthenticated ? "password" : "login"); setOpen(open === "edit" ? null : "edit"); }}>
+            <Pencil className="h-3.5 w-3.5" /> Edit details & password
           </Button>
-          {data.isAuthenticated ? (
-            <Button variant="secondary" size="sm" onClick={() => { setAuthMode("password"); setOpen(open === "security" ? null : "security"); }}>
-              <KeyRound className="h-3.5 w-3.5" /> Password
-            </Button>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={() => { setAuthMode("login"); setOpen(open === "security" ? null : "security"); }}>
-              <KeyRound className="h-3.5 w-3.5" /> Sign in
-            </Button>
-          )}
         </div>
         {open === "edit" && (
           <div className="mt-3 space-y-2 border-t border-ink/[0.07] pt-3">
@@ -396,7 +386,7 @@ export function SettingsView({
             </div>
           </div>
         )}
-        {open === "security" && (
+        {open === "edit" && (
           <div className="mt-3 border-t border-ink/[0.07] pt-3">
             <SegmentedControl
               options={[
