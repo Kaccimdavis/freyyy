@@ -50,7 +50,7 @@ function insight(signal: Signal, multiple: number | null) {
 }
 
 function PriceLevels({ signal }: { signal: Signal }) {
-  const precision = marketName(signal.symbol)[2];
+  const precision = signal.symbol === "XAUUSD" ? 0 : marketName(signal.symbol)[2];
   return <dl className="grid grid-cols-3 gap-2.5">
     {[{ name: "Entry", price: signal.entryPrice, tone: "text-ink" }, { name: "Stop loss", price: signal.stopLoss, tone: "text-bear" }, { name: "Take profit", price: signal.takeProfit, tone: "text-bull" }].map((level) => (
       <div key={level.name} className="freyr-inset flex min-h-[55px] min-w-0 flex-col justify-center px-1 py-2.5 text-center sm:min-h-[65px] sm:px-2">
@@ -62,7 +62,8 @@ function PriceLevels({ signal }: { signal: Signal }) {
 }
 
 function CurrentSignal({ signal, now, onOpen, timezone }: { signal: Signal; now: number; onOpen: () => void; timezone: string }) {
-  const [name, subtitle, precision] = marketName(signal.symbol);
+  const [name, subtitle] = marketName(signal.symbol);
+  const precision = signal.symbol === "XAUUSD" ? 0 : marketName(signal.symbol)[2];
   const remaining = new Date(signal.expiresAt).getTime() - now;
   const active = isOpenSignal(signal.status) && remaining > 0;
   const side = signal.direction === "BUY" ? 1 : -1;
@@ -244,7 +245,7 @@ export function SignalsView({ timezone, monitorTick, gold, onMarkets, navigation
     </section>}
     {tab === "closed" && archived.length > 0 && <ol className="freyr-history-scroll space-y-1.5" aria-label="Closed signal history">
       {archived.map((item) => {
-        const [, , precision] = marketName(item.symbol);
+        const precision = item.symbol === "XAUUSD" ? 0 : marketName(item.symbol)[2];
         const hit = isTargetHit(item.status);
         return <li key={item.id}>
           <button type="button" onClick={() => { setAuditError(""); setSelectedId(item.id); }} className="freyr-selectable freyr-history-row w-full cursor-pointer" aria-label={`Open ${marketName(item.symbol)[0]} closed signal`}>
