@@ -330,27 +330,50 @@ export function BacktestingView({
               >
                 {!reverseResult ? (
                   <p className="text-[11.5px] text-ink-secondary">
-                    Replays the opposite direction at each original entry time, mirroring its stop and target distances. It does not change the original backtest or create live signals.
+                    Runs three controlled experiments against the same saved trades and historical candles: reverse every trade, reverse only original losers, and reverse only original winners. No live signals or orders are affected.
                   </p>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                      <KpiStat label="Reverse Net P&L" value={formatCurrency(reverseResult.result.netProfit, true)} tone={reverseResult.result.netProfit >= 0 ? "bull" : "bear"} />
-                      <KpiStat label="Reverse Win Rate" value={`${reverseResult.result.winRate}%`} sub={`${reverseResult.result.winningTrades}W / ${reverseResult.result.losingTrades}L`} />
-                      <KpiStat label="Reverse Profit Factor" value={Number(reverseResult.result.profitFactor).toFixed(2)} tone={reverseResult.result.profitFactor >= 1 ? "bull" : "bear"} />
-                      <KpiStat label="Reverse Max Drawdown" value={`-${reverseResult.result.maxDrawdownPct}%`} tone="bear" />
+                    <div className="mb-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      <KpiStat label="Source Win Rate" value={`${reverseResult.sourceRun.winRate}%`} sub={`${reverseResult.sourceRun.winningTrades}W / ${reverseResult.sourceRun.losingTrades}L`} />
+                      <KpiStat label="All Reversed" value={`${reverseResult.experiments.allReversed.winRate}%`} sub={formatCurrency(reverseResult.experiments.allReversed.netProfit, true)} tone={reverseResult.experiments.allReversed.netProfit >= 0 ? "bull" : "bear"} />
+                      <KpiStat label="Losers Only" value={`${reverseResult.experiments.losersOnly.winRate}%`} sub={formatCurrency(reverseResult.experiments.losersOnly.netProfit, true)} tone={reverseResult.experiments.losersOnly.netProfit >= 0 ? "bull" : "bear"} />
+                      <KpiStat label="Winners Only" value={`${reverseResult.experiments.winnersOnly.winRate}%`} sub={formatCurrency(reverseResult.experiments.winnersOnly.netProfit, true)} tone={reverseResult.experiments.winnersOnly.netProfit >= 0 ? "bull" : "bear"} />
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
-                      <span>{reverseResult.result.totalTrades} reversed trades · {reverseResult.sourceRun.symbol} · {reverseResult.sourceRun.timeframe.toUpperCase()}</span>
-                      <span>Expected value: {formatCurrency(reverseResult.result.expectedValue, true)} / trade</span>
-                    </div>
-                    <div className="mt-3 max-h-[220px] overflow-auto">
-                      <table className="w-full text-left font-mono text-[10.5px] tabular-nums">
-                        <thead className="sticky top-0 bg-surface text-[9px] uppercase text-ink-tertiary">
-                          <tr><th className="py-2">Source #</th><th>Reverse side</th><th>Entry</th><th>Exit</th><th>Result</th><th className="text-right">P&L</th></tr>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[540px] text-left font-mono text-[10.5px] tabular-nums">
+                        <thead className="border-b border-ink/[0.06] font-sans text-[9px] uppercase text-ink-tertiary">
+                          <tr><th className="py-2">Experiment</th><th>Trades</th><th>Win rate</th><th>Profit factor</th><th>Net P&amp;L</th><th>Max DD</th><th>EV / trade</th></tr>
                         </thead>
                         <tbody className="divide-y divide-ink/[0.04]">
-                          {reverseResult.result.trades.map((trade: any) => (
+                          <tr>
+                            <td className="py-2 pr-2 font-sans">Original</td><td>{reverseResult.sourceRun.totalTrades}</td><td>{reverseResult.sourceRun.winRate}%</td><td>{Number(reverseResult.sourceRun.profitFactor).toFixed(2)}</td><td>{formatCurrency(reverseResult.sourceRun.netProfit, true)}</td><td>{reverseResult.sourceRun.maxDrawdownPct}%</td><td>{formatCurrency(reverseResult.sourceRun.expectedValue, true)}</td>
+                          </tr>
+                          {([
+                            ["All reversed", reverseResult.experiments.allReversed],
+                            ["Losers only reversed", reverseResult.experiments.losersOnly],
+                            ["Winners only reversed (control)", reverseResult.experiments.winnersOnly],
+                          ] as [string, any][]).map(([label, result]) => (
+                            <tr key={label}>
+                              <td className="py-2 pr-2 font-sans">{label}</td><td>{result.totalTrades}</td><td>{result.winRate}%</td><td>{Number(result.profitFactor).toFixed(2)}</td>
+                              <td className={result.netProfit >= 0 ? "text-bull" : "text-bear"}>{formatCurrency(result.netProfit, true)}</td><td>{result.maxDrawdownPct}%</td><td>{formatCurrency(result.expectedValue, true)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 flex flex-wrap justify-between gap-2 text-[10px] text-ink-secondary">
+                      <span>{reverseResult.data.candleCount.toLocaleString()} candles · {reverseResult.data.source}</span>
+                      <span>{reverseResult.sourceRun.symbol} · {reverseResult.sourceRun.timeframe.toUpperCase()} · same source run</span>
+                    </div>
+                    <div className="mt-3 max-h-[190px] overflow-auto">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary">Losers-only reversed trade ledger</p>
+                      <table className="w-full text-left font-mono text-[10px] tabular-nums">
+                        <thead className="sticky top-0 bg-surface text-[9px] uppercase text-ink-tertiary">
+                          <tr><th className="py-2">Source #</th><th>Side</th><th>Entry</th><th>Exit</th><th>Result</th><th className="text-right">P&amp;L</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink/[0.04]">
+                          {reverseResult.experiments.losersOnly.trades.map((trade: any) => (
                             <tr key={trade.sourceTradeIndex}>
                               <td className="py-1.5">{trade.sourceTradeIndex}</td>
                               <td className={trade.direction === "BUY" ? "text-bull" : "text-bear"}>{trade.direction}</td>
@@ -363,7 +386,7 @@ export function BacktestingView({
                       </table>
                     </div>
                     <p className="mt-3 text-[10px] leading-relaxed text-ink-tertiary">
-                      Counterfactual research only. Historical candle ordering is ambiguous when SL and TP are both touched; the engine assumes SL first. No live signals or orders are generated.
+                      Counterfactual research only. Losers-only reverses only source trades labelled LOSS; it does not create independent entries. Replayed candle ordering is ambiguous when SL and TP are both touched, so SL is assumed first. The candle feed is fetched again and may differ from the original run snapshot. Validate on unseen data with realistic execution costs before considering any live use.
                     </p>
                   </>
                 )}
