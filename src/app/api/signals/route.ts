@@ -56,16 +56,13 @@ export async function GET() {
 
 const SymbolSchema = z.string().trim().toUpperCase().refine((symbol) => INSTRUMENTS.some((item) => item.symbol === symbol), "Unsupported market");
 const FrameSchema = z.enum(["3m", "5m", "15m", "1h", "4h", "1d"]);
-const RequestSchema = z.discriminatedUnion("mode", [
-  z.object({
-    mode: z.literal("manual"), symbol: SymbolSchema.default("XAUUSD"), direction: z.enum(["BUY", "SELL"]),
-    entryPrice: z.number().positive(), stopLoss: z.number().positive(), takeProfit: z.number().positive(),
-    confidence: z.number().int().min(80).max(95), timeframe: FrameSchema.default("15m"), strategyName: z.string().trim().min(2).max(120),
-    marketConditions: z.string().trim().min(4).max(500), confirmations: z.array(z.string().trim().min(2).max(200)).min(2).max(10),
-    invalidationRule: z.string().trim().min(4).max(300), initialStatus: z.enum(["PENDING", "ACTIVE"]).default("PENDING"), strategyId: z.number().int().positive().optional(),
-  }).strict(),
-  z.object({ mode: z.literal("ai"), symbol: SymbolSchema.default("XAUUSD"), timeframe: FrameSchema.default("15m"), confidenceThreshold: z.number().min(80).max(95).default(80), strategyId: z.number().int().positive().optional() }),
-]);
+const RequestSchema = z.object({
+  mode: z.literal("ai"),
+  symbol: SymbolSchema.default("XAUUSD"),
+  timeframe: FrameSchema.default("15m"),
+  confidenceThreshold: z.number().min(70).max(95).default(70),
+  strategyId: z.number().int().positive().optional(),
+}).strict();
 
 function gateResponse(gate: { hasOpen: boolean; remainingMs: number; nextAvailableAt: string | null }) {
   if (gate.remainingMs > 0) {
@@ -90,38 +87,50 @@ export async function POST(req: NextRequest) {
     const strategy = input.strategyId ? (await db.select().from(strategies).where(and(eq(strategies.id, input.strategyId), eq(strategies.userId, user.id))).limit(1))[0] : undefined;
     if (input.strategyId && !strategy) return NextResponse.json({ error: "Strategy not found in this workspace" }, { status: 404 });
 
-    let candidate: Omit<typeof signals.$inferInsert, "userId" | "fingerprint">;
-    let observedPrice: number | null = null;
-    if (input.mode === "ai") {
-      const [risk] = await db.select().from(riskConfigs).where(eq(riskConfigs.userId, user.id)).limit(1);
-      const analysis = await runMultiEngineAnalysis({ symbol: instrument.symbol, confidenceThreshold: input.confidenceThreshold, minRiskReward: risk?.minRiskReward ?? 1.8 });
-      if (analysis.dataStatus !== "LIVE" && analysis.dataStatus !== "DELAYED") return NextResponse.json({ error: "Verified market data is unavailable. No signal was published." }, { status: 503 });
-      if (analysis.setupState !== "VALID" || analysis.direction === "NEUTRAL" || analysis.confirmationsCount < 2) {
-        return NextResponse.json({ error: "No setup currently meets the publication rules." }, { status: 422 });
-      }
-      candidate = {
-        symbol: instrument.symbol, direction: analysis.direction === "BULLISH" ? "BUY" : "SELL", timeframe: "15m",
-        entryPrice: analysis.entryPrice, stopLoss: analysis.stopLoss, takeProfit: analysis.takeProfit,
-        riskReward: analysis.riskReward, confidence: analysis.confidenceScore, strategyId: strategy?.id,
-        strategyName: strategy?.name ?? "FREYR confluence", marketConditions: analysis.setupExplanation, confirmations: analysis.supportingEvidence,
-        invalidationRule: analysis.invalidationConditions[0] ?? "A move beyond the original stop invalidates the setup.",
-        dataSource: analysis.dataSource, dataStatus: analysis.dataStatus, status: "PENDING",
-      };
-      observedPrice = analysis.currentPrice > 0 ? analysis.currentPrice : null;
-    } else {
-      if (/\b2\.6(18)?\b/i.test(`${input.strategyName} ${input.marketConditions}`)) {
-        return NextResponse.json({ error: "That strategy is not supported." }, { status: 400 });
-      }
-      const { entryPrice, stopLoss, takeProfit } = input;
-      candidate = {
-        symbol: instrument.symbol, direction: input.direction, timeframe: input.timeframe, entryPrice, stopLoss, takeProfit,
-        riskReward: Number((Math.abs(takeProfit - entryPrice) / Math.abs(entryPrice - stopLoss)).toFixed(2)),
-        confidence: input.confidence, strategyId: strategy?.id, strategyName: strategy?.name ?? input.strategyName,
-        marketConditions: input.marketConditions, confirmations: input.confirmations, invalidationRule: input.invalidationRule,
-        dataSource: "User-published", dataStatus: "MANUAL", status: input.initialStatus,
-      };
+    const [risk] = await db.select().from(riskConfigs).where(eq(riskConfigs.userId, user.id)).limit(1);
+    const analysis = await runMultiEngineAnalysis({
+      symbol: instrument.symbol,
+      confidenceThreshold: input.confidenceThreshold,
+      minRiskReward: risk?.minRiskReward ?? 1.8,
+    });
+    const freshEnoughCached = analysis.dataStatus === "CACHED" && analysis.dataAgeSec <= 60;
+    if (analysis.dataStatus !== "LIVE" && analysis.dataStatus !== "DELAYED" && !freshEnoughCached) {
+      return NextResponse.json({
+        error: "Market data is unavailable or stale. Cached data is accepted only when it is 60 seconds old or newer.",
+        dataStatus: analysis.dataStatus,
+        dataAgeSec: analysis.dataAgeSec,
+      }, { status: 503 });
     }
-    if (candidate.confidence < 80) return NextResponse.json({ error: "Signal confidence is below the mandatory 80% publication threshold. No signal was published.", confidence: candidate.confidence, requiredConfidence: 80 }, { status: 422 });
+    if (analysis.setupState !== "VALID" || analysis.direction === "NEUTRAL" || analysis.confirmationsCount < 2) {
+      return NextResponse.json({ error: "No setup currently meets the publication rules." }, { status: 422 });
+    }
+
+    const candidate: Omit<typeof signals.$inferInsert, "userId" | "fingerprint"> = {
+      symbol: instrument.symbol,
+      direction: analysis.direction === "BULLISH" ? "BUY" : "SELL",
+      timeframe: input.timeframe,
+      entryPrice: analysis.entryPrice,
+      stopLoss: analysis.stopLoss,
+      takeProfit: analysis.takeProfit,
+      riskReward: analysis.riskReward,
+      confidence: analysis.confidenceScore,
+      strategyId: strategy?.id,
+      strategyName: strategy?.name ?? "FREYR order-flow confluence",
+      marketConditions: analysis.setupExplanation,
+      confirmations: analysis.supportingEvidence,
+      invalidationRule: analysis.invalidationConditions[0] ?? "A move beyond the original stop invalidates the setup.",
+      dataSource: analysis.dataSource,
+      dataStatus: analysis.dataStatus,
+      status: "PENDING",
+    };
+    const observedPrice = analysis.currentPrice > 0 ? analysis.currentPrice : null;
+    if (candidate.confidence < 70) {
+      return NextResponse.json({
+        error: "Signal candidate is below the 70% minimum confidence threshold.",
+        confidence: candidate.confidence,
+        requiredConfidence: 70,
+      }, { status: 422 });
+    }
     if (!validSignalLevels(candidate.direction === "BUY" ? "BUY" : "SELL", candidate.entryPrice, candidate.stopLoss, candidate.takeProfit) || !Number.isFinite(candidate.riskReward)) {
       return NextResponse.json({ error: "Stop loss and take profit must be on opposite sides of the entry." }, { status: input.mode === "ai" ? 422 : 400 });
     }
