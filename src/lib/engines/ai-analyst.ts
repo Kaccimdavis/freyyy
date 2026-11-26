@@ -36,6 +36,7 @@ export interface DecisionEngineOutput {
   briefing: string;
   dataSource: string;
   dataStatus: DataStatus;
+  dataAgeSec: number;
   analyzedAt: string;
   h1Bias: "BULLISH" | "BEARISH" | "NEUTRAL";
   m15Structure: "BULLISH" | "BEARISH" | "RANGING";
@@ -116,7 +117,7 @@ export async function runMultiEngineAnalysis(params: {
   const inst = getInstrument(params.symbol ?? "XAUUSD");
   const symbol = inst.symbol;
   const dec = inst.decimals;
-  const threshold = Math.min(95, Math.max(80, params.confidenceThreshold ?? 80));
+  const threshold = Math.min(95, Math.max(70, params.confidenceThreshold ?? 70));
   const minRr = Math.max(1.2, params.minRiskReward ?? 1.8);
 
   // Run interconnected live engines in parallel
@@ -169,6 +170,7 @@ export async function runMultiEngineAnalysis(params: {
       briefing: `${symbol} market feed is currently unavailable. No trade signals or bias will be manufactured.`,
       dataSource: m15Res.source,
       dataStatus: "UNAVAILABLE",
+      dataAgeSec: Math.max(h1Res.cacheAgeSec, m15Res.cacheAgeSec),
       analyzedAt: new Date().toISOString(),
       h1Bias: "NEUTRAL",
       m15Structure: "RANGING",
@@ -226,8 +228,8 @@ export async function runMultiEngineAnalysis(params: {
   );
   const eventRiskElevated = in2Hours.length > 0;
 
-  // Weight breakdown across 5 engines (must total 100%)
-  // HTF Technical (25%) + Liquidity & Structure (30%) + ModFlow Order Flow (25%) + Execution Timing M5 (10%) + Macro/Session Clarity (10%)
+  // Supporting intelligence is context only; primary directional weight belongs to ModFlow order flow.
+  // Heatmap and VWAP are not yet implemented as independent live data feeds in this module.
   const liqSigned =
     (liqM15.trend === "BULLISH" ? 55 : liqM15.trend === "BEARISH" ? -55 : 0) +
     (liqM15.lastStructureEvent?.direction === "BULLISH" ? 28 : liqM15.lastStructureEvent?.direction === "BEARISH" ? -28 : 0) +
@@ -338,9 +340,12 @@ export async function runMultiEngineAnalysis(params: {
     },
   ];
 
-  // Aggregate weighted directional consensus (-100 to +100)
+  // Primary decision authority is order flow. Structure, HTF and execution are supporting confluences.
+  // Order-flow telemetry currently includes candle-derived delta estimates; it is not equivalent to
+  // exchange-native bid/ask footprint data. Independent ModFlow validation remains mandatory before publication.
+  // Weights: ModFlow order flow 55%, M15 structure 25%, H1 context 10%, M5 timing 10%.
   const netDirectional =
-    h1Tech.score * 0.28 + liqSigned * 0.34 + mfSigned * 0.26 + m5Tech.score * 0.12;
+    mfSigned * 0.55 + liqSigned * 0.25 + h1Tech.score * 0.10 + m5Tech.score * 0.10;
 
   const direction: DecisionEngineOutput["direction"] =
     netDirectional >= 12 ? "BULLISH" : netDirectional <= -12 ? "BEARISH" : "NEUTRAL";
@@ -557,6 +562,7 @@ export async function runMultiEngineAnalysis(params: {
     briefing,
     dataSource: m15Res.source,
     dataStatus: m15Res.status,
+    dataAgeSec: m15Res.cacheAgeSec,
     analyzedAt: new Date().toISOString(),
     h1Bias: h1Tech.bias,
     m15Structure: liqM15.trend,
