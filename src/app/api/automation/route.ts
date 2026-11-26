@@ -202,35 +202,29 @@ export async function POST(req: NextRequest) {
     }
 
     if (d.action === "attempt_live_execution") {
-      if (d.enabled && !brokerReady) {
+      if (d.enabled) {
         await db.insert(automationLogs).values({
           userId: user.id,
           action: "AUTO_EXECUTION_BLOCKED",
           status: "BLOCKED",
           symbol: "ALL",
-          detail:
-            "Refused: no verified, explicitly authorized broker is configured.",
+          detail: "Refused: this build has no implemented MT5/broker order-placement adapter. Broker authorization flags alone cannot place or verify trades.",
         });
         return NextResponse.json(
-          {
-            error:
-              "Automated execution is locked. Verify and explicitly authorize a tested broker under Settings first.",
-          },
-          { status: 403 }
+          { error: "MT5 auto-execution is not implemented in this build. Connect a tested execution bridge before authorizing orders." },
+          { status: 501 }
         );
       }
       const next: MasterState = {
         ...cur,
-        executionAuthorized: d.enabled && brokerReady,
+        executionAuthorized: false,
         lastToggledAt: new Date().toISOString(),
-        reason: d.enabled
-          ? `Authorized execution connected via ${user.brokerConfig.provider} (${user.brokerConfig.environment === "demo" ? "Demo" : "Real"}).`
-          : "Execution switched off by operator.",
+        reason: "Execution disabled. This build does not contain a broker order-placement adapter.",
       };
       await setMasterState(user.id, next);
       await db.insert(automationLogs).values({
         userId: user.id,
-        action: d.enabled ? "EXECUTION_AUTHORIZED" : "EXECUTION_DISABLED",
+        action: "EXECUTION_DISABLED",
         status: "CONFIG_UPDATED",
         symbol: "ALL",
         detail: next.reason,
