@@ -2,6 +2,7 @@ import type { BacktestTradeRecord } from "@/db/schema";
 import type { Candle } from "../market-data";
 
 export interface ReverseStrategyInput {
+  selection?: "ALL" | "LOSERS_ONLY" | "WINNERS_ONLY";
   trades: BacktestTradeRecord[];
   candles: Candle[];
   initialBalance: number;
@@ -30,7 +31,7 @@ export interface ReverseTradeResult {
 
 export interface ReverseStrategyResult {
   engine: "REVERSE_STRATEGY_ENGINE";
-  mode: "COUNTERFACTUAL_REPLAY";
+  mode: "ALL_REVERSED" | "LOSERS_ONLY_REVERSED" | "WINNERS_ONLY_REVERSED";
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
@@ -51,6 +52,8 @@ export interface ReverseStrategyResult {
  */
 export function runReverseStrategyResearch(input: ReverseStrategyInput): ReverseStrategyResult {
   const { trades, candles, initialBalance, riskPercent, spreadPoints, pipSize, commissionPerLot, contractSize } = input;
+  const selection = input.selection ?? "ALL";
+  const selectedTrades = trades.filter((trade) => selection === "ALL" || (selection === "LOSERS_ONLY" ? trade.outcome === "LOSS" : trade.outcome === "WIN"));
   const sortedCandles = [...candles].sort((a, b) => a.time - b.time);
   const candleIndex = new Map<number, number>();
   sortedCandles.forEach((c, i) => candleIndex.set(c.time, i));
@@ -61,7 +64,7 @@ export function runReverseStrategyResearch(input: ReverseStrategyInput): Reverse
   const results: ReverseTradeResult[] = [];
   const spread = Math.max(0, spreadPoints * pipSize);
 
-  for (const original of [...trades].sort((a, b) => a.entryTime - b.entryTime)) {
+  for (const original of [...selectedTrades].sort((a, b) => a.entryTime - b.entryTime)) {
     const start = candleIndex.get(original.entryTime);
     if (start === undefined || start >= sortedCandles.length - 1) continue;
 
@@ -136,7 +139,7 @@ export function runReverseStrategyResearch(input: ReverseStrategyInput): Reverse
 
   return {
     engine: "REVERSE_STRATEGY_ENGINE",
-    mode: "COUNTERFACTUAL_REPLAY",
+    mode: selection === "ALL" ? "ALL_REVERSED" : selection === "LOSERS_ONLY" ? "LOSERS_ONLY_REVERSED" : "WINNERS_ONLY_REVERSED",
     totalTrades: results.length,
     winningTrades: wins.length,
     losingTrades: losses.length,
@@ -151,7 +154,8 @@ export function runReverseStrategyResearch(input: ReverseStrategyInput): Reverse
       "Counterfactual replay only: opposite trades are evaluated at the original entry timestamps.",
       "The reverse trade mirrors the original stop distance and target distance; it does not invent a new signal or optimize levels.",
       "Candle data cannot reveal intrabar price ordering. When stop-loss and take-profit are both touched in one candle, stop-loss is conservatively assumed first.",
-      "Only trades saved in the backtest run are eligible; runs persist at most 150 trade records.",
+      "Only saved trade records are eligible; runs persist at most 150 trade records.",
+      selection === "LOSERS_ONLY" ? "Losers-only mode reverses only trades marked LOSS by the source backtest; it is not a new entry model." : selection === "WINNERS_ONLY" ? "Winners-only mode reverses only trades marked WIN by the source backtest; it is a diagnostic control." : "All-trades mode reverses every saved source trade.",
       "Results are research-only and must not publish or execute live signals.",
     ],
   };
