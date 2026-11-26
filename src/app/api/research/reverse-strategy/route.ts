@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient historical candles to replay this run. No reverse results were generated." }, { status: 422 });
     }
 
-    const result = runReverseStrategyResearch({
+    const common = {
       trades: run.trades,
       candles: series.candles,
       initialBalance: run.initialBalance,
@@ -45,12 +45,24 @@ export async function POST(req: NextRequest) {
       pipSize: instrument.pipSize,
       commissionPerLot: run.commissionPerLot,
       contractSize: instrument.contractSize,
-    });
+    };
+    const [allReversed, losersOnly, winnersOnly] = await Promise.all([
+      Promise.resolve(runReverseStrategyResearch({ ...common, selection: "ALL" })),
+      Promise.resolve(runReverseStrategyResearch({ ...common, selection: "LOSERS_ONLY" })),
+      Promise.resolve(runReverseStrategyResearch({ ...common, selection: "WINNERS_ONLY" })),
+    ]);
 
     return NextResponse.json({
-      sourceRun: { id: run.id, strategyName: run.strategyName, symbol: run.symbol, timeframe: run.timeframe, startDate: run.startDate, endDate: run.endDate },
-      result,
-      disclaimer: "RESEARCH-ONLY COUNTERFACTUAL SIMULATION. This engine does not generate, alter, or publish live signals.",
+      sourceRun: {
+        id: run.id, strategyName: run.strategyName, symbol: run.symbol, timeframe: run.timeframe,
+        startDate: run.startDate, endDate: run.endDate, totalTrades: run.totalTrades,
+        winningTrades: run.winningTrades, losingTrades: run.losingTrades, winRate: run.winRate,
+        profitFactor: run.profitFactor, netProfit: run.netProfit, maxDrawdownPct: run.maxDrawdownPct,
+        expectedValue: run.expectedValue,
+      },
+      experiments: { allReversed, losersOnly, winnersOnly },
+      data: { candleCount: series.candles.length, source: series.source },
+      disclaimer: "RESEARCH-ONLY COUNTERFACTUAL SIMULATION. These experiments do not generate, alter, or publish live signals.",
     });
   } catch (error) {
     console.error("Reverse Strategy Engine error:", error);
