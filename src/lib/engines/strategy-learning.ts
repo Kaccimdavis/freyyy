@@ -71,7 +71,6 @@ function snapshot(candles: Candle[]): StrategyLearningFeatures | null {
   // The caller supplies only candles timestamped strictly before the trade entry.
   if (candles.length < 30) return null;
   const current = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
   const closes = candles.map((c) => c.close);
   const fast = ema(closes.slice(-40), 12);
   const slow = ema(closes.slice(-60), 30);
