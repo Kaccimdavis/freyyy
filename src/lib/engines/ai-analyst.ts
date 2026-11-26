@@ -266,8 +266,8 @@ export async function runMultiEngineAnalysis(params: {
 
   const engineBreakdown: EngineScoreItem[] = [
     {
-      engine: "Technical Engine (H1 Bias)",
-      weight: 25,
+      engine: "Supporting Confluence — H1 Trend",
+      weight: 10,
       bias: h1Tech.bias,
       score: Math.min(100, Math.round(50 + Math.abs(h1Tech.score) * 0.5)),
       summary: `H1 directional bias is ${h1Tech.bias}${h1Tech.ema20 ? ` · EMA20 ${formatPx(h1Tech.ema20, dec)}` : ""}${h1Tech.rsi14 !== null ? ` · RSI ${h1Tech.rsi14}` : ""}.`,
@@ -280,8 +280,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: h1Res.status === "SIMULATED" ? "CACHED" : h1Res.status,
     },
     {
-      engine: "Liquidity & Structure (M15)",
-      weight: 30,
+      engine: "Supporting Confluence — M15 Structure",
+      weight: 25,
       bias: liqM15.trend === "BULLISH" ? "BULLISH" : liqM15.trend === "BEARISH" ? "BEARISH" : "NEUTRAL",
       score: Math.min(100, Math.max(35, Math.round(45 + Math.abs(liqSigned) * 0.52))),
       summary: liqM15.structureBias,
@@ -292,8 +292,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: m15Res.status === "SIMULATED" ? "CACHED" : m15Res.status,
     },
     {
-      engine: "ModFlow Order Flow Engine",
-      weight: 25,
+      engine: "PRIMARY — ModFlow Order Flow",
+      weight: 55,
       bias: modflow.summary.bias,
       score: Math.min(100, Math.max(35, Math.round(48 + Math.abs(mfSigned) * 0.48))),
       summary: modflow.summary.confirmationText,
@@ -307,7 +307,7 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: modflow.status === "SIMULATED" ? "CACHED" : modflow.status,
     },
     {
-      engine: "Execution Engine (M5 Timing)",
+      engine: "Supporting Confluence — M5 Execution",
       weight: 10,
       bias: m5Tech.bias,
       score: Math.min(100, Math.round(50 + Math.abs(m5Tech.score) * 0.45)),
@@ -319,8 +319,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: m5Res.status === "SIMULATED" ? "CACHED" : m5Res.status,
     },
     {
-      engine: "Fundamental Calendar Guard",
-      weight: 10,
+      engine: "Macro / Session Risk Guard",
+      weight: 0,
       bias: "NEUTRAL",
       score: sessionQualityScore,
       summary:
@@ -347,8 +347,14 @@ export async function runMultiEngineAnalysis(params: {
   const netDirectional =
     mfSigned * 0.55 + liqSigned * 0.25 + h1Tech.score * 0.10 + m5Tech.score * 0.10;
 
+  // ModFlow owns the primary directional decision. Other engines may confirm or veto via disagreement,
+  // but they cannot manufacture a direction when the primary order-flow reading is neutral.
   const direction: DecisionEngineOutput["direction"] =
-    netDirectional >= 12 ? "BULLISH" : netDirectional <= -12 ? "BEARISH" : "NEUTRAL";
+    modflow.summary.bias === "BULLISH" && netDirectional >= 8
+      ? "BULLISH"
+      : modflow.summary.bias === "BEARISH" && netDirectional <= -8
+        ? "BEARISH"
+        : "NEUTRAL";
 
   // Count independent directional engine confirmations (strict anti-single-indicator rule)
   const dirEngines = engineBreakdown.slice(0, 4);
