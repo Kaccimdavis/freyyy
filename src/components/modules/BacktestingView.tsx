@@ -363,7 +363,7 @@ export function BacktestingView({
                       </table>
                     </div>
                     <div className="mt-3 flex flex-wrap justify-between gap-2 text-[10px] text-ink-secondary">
-                      <span>{reverseResult.data.candleCount.toLocaleString()} candles · {reverseResult.data.source}</span>
+                      <span>{reverseResult.data.candleCount.toLocaleString()} candles · {reverseResult.data.source}</span><span>Losers-only: {reverseResult.experiments.losersOnly.totalTrades}/{reverseResult.experiments.losersOnly.sourceTradeCount} replayed · {reverseResult.experiments.losersOnly.skippedTrades} skipped</span>
                       <span>{reverseResult.sourceRun.symbol} · {reverseResult.sourceRun.timeframe.toUpperCase()} · same source run</span>
                     </div>
                     <div className="mt-3 max-h-[190px] overflow-auto">
