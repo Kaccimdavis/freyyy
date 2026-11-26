@@ -175,26 +175,31 @@ export async function POST(req: NextRequest) {
     }
 
     if (d.action === "toggle_monitoring") {
-      if (cur.emergencyStopped && d.enabled) {
+      if (d.enabled) {
+        await db.insert(automationLogs).values({
+          userId: user.id,
+          action: "SIGNAL_MONITORING_BLOCKED",
+          status: "BLOCKED",
+          symbol: "XAUUSD",
+          detail: "Refused: this build does not yet have a scheduled autonomous signal scanner with independent ModFlow approval.",
+        });
         return NextResponse.json(
-          { error: "Clear Emergency Stop before enabling automated signal monitoring." },
-          { status: 409 }
+          { error: "Autonomous signal scanning is not installed yet. It will remain disabled until scheduled analysis and independent ModFlow validation are implemented." },
+          { status: 501 }
         );
       }
       const next: MasterState = {
         ...cur,
-        masterEnabled: d.enabled,
-        executionAuthorized: false, // signal monitoring NEVER implies auto order execution
+        masterEnabled: false,
+        executionAuthorized: false,
         lastToggledAt: new Date().toISOString(),
-        reason: d.enabled
-          ? "Signal monitoring active (read-only alerts only — zero broker trades placed automatically)."
-          : "Automated signal monitoring disabled.",
+        reason: "Autonomous signal scanning disabled; scheduled scanner and independent ModFlow approval are not yet implemented.",
       };
       await setMasterState(user.id, next);
       await db.insert(automationLogs).values({
         userId: user.id,
-        action: d.enabled ? "MONITORING_ENABLED" : "MONITORING_DISABLED",
-        status: d.enabled ? "MONITORED" : "CONFIG_UPDATED",
+        action: "MONITORING_DISABLED",
+        status: "CONFIG_UPDATED",
         symbol: "XAUUSD",
         detail: next.reason,
       });
