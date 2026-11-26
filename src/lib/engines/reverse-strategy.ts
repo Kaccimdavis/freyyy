@@ -32,6 +32,8 @@ export interface ReverseTradeResult {
 export interface ReverseStrategyResult {
   engine: "REVERSE_STRATEGY_ENGINE";
   mode: "ALL_REVERSED" | "LOSERS_ONLY_REVERSED" | "WINNERS_ONLY_REVERSED";
+  sourceTradeCount: number;
+  skippedTrades: number;
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
@@ -140,6 +142,8 @@ export function runReverseStrategyResearch(input: ReverseStrategyInput): Reverse
   return {
     engine: "REVERSE_STRATEGY_ENGINE",
     mode: selection === "ALL" ? "ALL_REVERSED" : selection === "LOSERS_ONLY" ? "LOSERS_ONLY_REVERSED" : "WINNERS_ONLY_REVERSED",
+    sourceTradeCount: selectedTrades.length,
+    skippedTrades: Math.max(0, selectedTrades.length - results.length),
     totalTrades: results.length,
     winningTrades: wins.length,
     losingTrades: losses.length,
