@@ -128,7 +128,8 @@ export function AutomationView({
   if (loading || !data) return <PanelSkeleton rows={7} />;
 
   const { master, broker, rules, logs } = data;
-  const brokerAuthorized = broker.connected && broker.verified && broker.authorizedForAuto;
+  // This repository currently has no MT5/broker order-placement adapter. UI authorization must stay locked.
+  const brokerAuthorized = false;
 
   return (
     <div className="space-y-4">
@@ -201,8 +202,8 @@ export function AutomationView({
               </div>
               <p className="text-[11px] text-ink-secondary">
                 {brokerAuthorized
-                  ? `Explicitly authorized via ${broker.provider} (${broker.environment === "demo" ? "Demo" : "Real"}).`
-                  : "Blocked until a verified broker integration is authorized in Settings."}
+                  ? `Execution adapter verified via ${broker.provider}.`
+                  : "Not available: no MT5 order-placement bridge is installed. This control cannot place trades."}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -212,9 +213,10 @@ export function AutomationView({
                 </Button>
               )}
               <Switch
-                checked={master.executionAuthorized}
-                onChange={(v) => send({ action: "attempt_live_execution", enabled: v })}
-                label="Toggle automated execution"
+                checked={false}
+                disabled
+                onChange={() => undefined}
+                label="MT5 auto-execution unavailable until an execution bridge is installed"
               />
             </div>
           </div>
