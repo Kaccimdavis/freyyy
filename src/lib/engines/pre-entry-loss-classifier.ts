@@ -131,8 +131,8 @@ function aucScore(items: ClassifierPrediction[]): number | null {
   let wins = 0;
   let ties = 0;
   for (const p of positives) for (const n of negatives) {
-    if (p.lossRiskScore > n.lossProbability) wins++;
-    else if (p.lossRiskScore === n.lossProbability) ties++;
+    if (p.lossRiskScore > n.lossRiskScore) wins++;
+    else if (p.lossRiskScore === n.lossRiskScore) ties++;
   }
   return (wins + ties * 0.5) / (positives.length * negatives.length);
 }
