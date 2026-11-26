@@ -153,7 +153,7 @@ export function AutomationView({
               ) : (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-ink/12 bg-ink/[0.05] px-2.5 py-0.5 text-[10.5px] font-medium text-ink">
                   <Lock className="h-3 w-3 text-ink-secondary" />
-                  Auto-Execution: {master.executionAuthorized ? "Authorized" : "Disabled (Safe Default)"}
+                  Auto-Execution: Not implemented
                 </span>
               )}
               <span className="font-mono text-[10.5px] text-ink-secondary">
@@ -162,7 +162,7 @@ export function AutomationView({
             </div>
             <p className="mt-2 text-[12.5px] text-ink-secondary">{cleanCopy(master.reason)}</p>
             <p className="mt-1 text-[11px] text-ink-tertiary">
-              Broker: {broker.provider} · Updated {formatDateTime(master.lastToggledAt, timezone, { short: true })}
+              Broker profile: {broker.provider} · MT5 order bridge not installed · Updated {formatDateTime(master.lastToggledAt, timezone, { short: true })}
             </p>
           </div>
 
