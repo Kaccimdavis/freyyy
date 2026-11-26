@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { FlaskConical, Play } from "lucide-react";
+import { ArrowLeftRight, FlaskConical, Play } from "lucide-react";
 import type { BacktestTradeRecord, EquityPoint } from "@/db/schema";
 import {
   Button,
@@ -75,6 +75,8 @@ export function BacktestingView({
   const [compareId, setCompareId] = useState<number | null>(null);
   const [curveMode, setCurveMode] = useState<"equity" | "drawdown">("equity");
   const [running, setRunning] = useState(false);
+  const [reverseRunning, setReverseRunning] = useState(false);
+  const [reverseResult, setReverseResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -151,9 +153,31 @@ export function BacktestingView({
         return;
       }
       setActiveRun(j.run);
+      setReverseResult(null);
       setRuns((prev) => [j.run, ...prev]);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const runReverseResearch = async () => {
+    if (!activeRun) return;
+    setReverseRunning(true);
+    setError(null);
+    setReverseResult(null);
+    try {
+      const res = await fetch("/api/research/reverse-strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backtestRunId: activeRun.id }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error ?? "Reverse research failed");
+      setReverseResult(payload);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reverse research failed");
+    } finally {
+      setReverseRunning(false);
     }
   };
 
@@ -293,6 +317,58 @@ export function BacktestingView({
             />
           ) : (
             <>
+              {/* Independent Reverse Strategy Research */}
+              <Panel
+                title={<span className="inline-flex items-center gap-2"><ArrowLeftRight className="h-3.5 w-3.5" /> Reverse Strategy Engine</span>}
+                subtitle="Research-only counterfactual replay of this saved backtest"
+                action={
+                  <Button type="button" variant="secondary" className="h-8" onClick={runReverseResearch} disabled={reverseRunning || activeRun.trades.length === 0}>
+                    <ArrowLeftRight className="h-3.5 w-3.5" />
+                    {reverseRunning ? "Replaying…" : "Run Reverse Test"}
+                  </Button>
+                }
+              >
+                {!reverseResult ? (
+                  <p className="text-[11.5px] text-ink-secondary">
+                    Replays the opposite direction at each original entry time, mirroring its stop and target distances. It does not change the original backtest or create live signals.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      <KpiStat label="Reverse Net P&L" value={formatCurrency(reverseResult.result.netProfit, true)} tone={reverseResult.result.netProfit >= 0 ? "bull" : "bear"} />
+                      <KpiStat label="Reverse Win Rate" value={`${reverseResult.result.winRate}%`} sub={`${reverseResult.result.winningTrades}W / ${reverseResult.result.losingTrades}L`} />
+                      <KpiStat label="Reverse Profit Factor" value={Number(reverseResult.result.profitFactor).toFixed(2)} tone={reverseResult.result.profitFactor >= 1 ? "bull" : "bear"} />
+                      <KpiStat label="Reverse Max Drawdown" value={`-${reverseResult.result.maxDrawdownPct}%`} tone="bear" />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
+                      <span>{reverseResult.result.totalTrades} reversed trades · {reverseResult.sourceRun.symbol} · {reverseResult.sourceRun.timeframe.toUpperCase()}</span>
+                      <span>Expected value: {formatCurrency(reverseResult.result.expectedValue, true)} / trade</span>
+                    </div>
+                    <div className="mt-3 max-h-[220px] overflow-auto">
+                      <table className="w-full text-left font-mono text-[10.5px] tabular-nums">
+                        <thead className="sticky top-0 bg-surface text-[9px] uppercase text-ink-tertiary">
+                          <tr><th className="py-2">Source #</th><th>Reverse side</th><th>Entry</th><th>Exit</th><th>Result</th><th className="text-right">P&L</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink/[0.04]">
+                          {reverseResult.result.trades.map((trade: any) => (
+                            <tr key={trade.sourceTradeIndex}>
+                              <td className="py-1.5">{trade.sourceTradeIndex}</td>
+                              <td className={trade.direction === "BUY" ? "text-bull" : "text-bear"}>{trade.direction}</td>
+                              <td>{formatPrice(trade.entryPrice)}</td><td>{formatPrice(trade.exitPrice)}</td>
+                              <td>{trade.outcome} · {trade.exitReason}</td>
+                              <td className={cn("text-right", trade.pnl >= 0 ? "text-bull" : "text-bear")}>{formatCurrency(trade.pnl, true)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mt-3 text-[10px] leading-relaxed text-ink-tertiary">
+                      Counterfactual research only. Historical candle ordering is ambiguous when SL and TP are both touched; the engine assumes SL first. No live signals or orders are generated.
+                    </p>
+                  </>
+                )}
+              </Panel>
+
               {/* Metrics Grid */}
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 <KpiStat
