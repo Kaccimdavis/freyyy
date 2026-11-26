@@ -132,7 +132,7 @@ function aucScore(items: ClassifierPrediction[]): number | null {
   let ties = 0;
   for (const p of positives) for (const n of negatives) {
     if (p.lossRiskScore > n.lossProbability) wins++;
-    else if (p.lossProbability === n.lossProbability) ties++;
+    else if (p.lossRiskScore === n.lossProbability) ties++;
   }
   return (wins + ties * 0.5) / (positives.length * negatives.length);
 }
@@ -144,11 +144,11 @@ function aucScore(items: ClassifierPrediction[]): number | null {
  */
 export function buildPreEntryLossClassifier(input: {
   rows: StrategyLearningRow[];
-  probabilityThreshold?: number;
+  riskScoreThreshold?: number;
   minimumTrainingRows?: number;
   testBatchSize?: number;
 }): PreEntryLossClassifierReport {
-  const threshold = input.probabilityThreshold ?? 0.6;
+  const threshold = input.riskScoreThreshold ?? 0.6;
   const minimumTrainingRows = input.minimumTrainingRows ?? 120;
   const testBatchSize = input.testBatchSize ?? 50;
   const rows = [...input.rows].sort((a, b) => a.entryTime - b.entryTime);
@@ -213,7 +213,7 @@ export function buildPreEntryLossClassifier(input: {
   const flagged = tp + fp;
   const notFlagged = fn + tn;
   const actualLosses = tp + fn;
-  const lastTrainEnd = Math.max(minimumTrainingRows, rows.length - 1);
+  const lastTrainEnd = rows.length;
   const finalModel = new Set(labels.slice(0, lastTrainEnd)).size === 2
     ? fitLogistic(vectors.slice(0, lastTrainEnd), labels.slice(0, lastTrainEnd))
     : null;
