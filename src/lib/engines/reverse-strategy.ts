@@ -78,7 +78,8 @@ export function runReverseStrategyResearch(input: ReverseStrategyInput): Reverse
     const commission = Math.max(0, commissionPerLot * lots);
 
     // Match the original trade's holding period, with a 36-bar safety ceiling.
-    const originalDuration = Math.max(1, candleIndex.get(original.exitTime)! - start);
+    const originalExitIndex = candleIndex.get(original.exitTime);
+    const originalDuration = originalExitIndex === undefined ? 36 : Math.max(1, originalExitIndex - start);
     const maxBars = Math.min(36, originalDuration);
     let exitPrice = entryPrice;
     let exitTime = sortedCandles[start + 1].time;
