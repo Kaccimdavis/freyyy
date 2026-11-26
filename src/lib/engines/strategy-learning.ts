@@ -77,8 +77,10 @@ function snapshot(candles: Candle[]): StrategyLearningFeatures | null {
   const slow = ema(closes.slice(-60), 30);
   if (fast === null || slow === null) return null;
 
-  const trValues = candles.slice(-15).map((c, index, list) => {
-    const priorClose = index > 0 ? list[index - 1].close : previous.close;
+  const atrWindow = candles.slice(-15);
+  const atrStart = candles.length - atrWindow.length;
+  const trValues = atrWindow.map((c, index) => {
+    const priorClose = candles[Math.max(0, atrStart + index - 1)].close;
     return Math.max(c.high - c.low, Math.abs(c.high - priorClose), Math.abs(c.low - priorClose));
   });
   const atr = trValues.reduce((sum, n) => sum + n, 0) / trValues.length;
@@ -159,9 +161,16 @@ export function buildStrategyLearningReport(input: {
   const skipped: StrategyLearningReport["skipped"] = [];
 
   for (const trade of [...input.trades].sort((a, b) => a.entryTime - b.entryTime)) {
-    // Strictly exclude the candle at entryTime. This avoids using any candle whose
-    // timestamp may represent the start rather than the close of that bar.
-    const prior = candles.filter((c) => c.time < trade.entryTime).slice(-60);
+    // Binary search the final candle strictly before entry to avoid scanning the full
+    // historical series once per trade.
+    let lo = 0;
+    let hi = candles.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (candles[mid].time < trade.entryTime) lo = mid + 1;
+      else hi = mid;
+    }
+    const prior = candles.slice(Math.max(0, lo - 60), lo);
     const features = snapshot(prior);
     if (!features) {
       skipped.push({ tradeIndex: trade.index, reason: "Fewer than 30 complete pre-entry candles or invalid ATR." });
