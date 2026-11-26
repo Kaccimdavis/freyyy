@@ -250,7 +250,8 @@ export async function runMultiEngineAnalysis(params: {
             : modflow.summary.cvdDivergence === "BEARISH_DIV"
               ? -24
               : 0) +
-          (currentPrice > modflow.volumeProfile.poc ? 14 : -14)
+          (currentPrice > modflow.volumeProfile.poc ? 14 : -14) +
+          (modflow.rollingVwap !== null ? (currentPrice > modflow.rollingVwap ? 10 : -10) : 0)
       )
     )
   );
