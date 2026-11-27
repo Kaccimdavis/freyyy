@@ -38,6 +38,7 @@ const RunSchema = z.object({
       "session_range_reversal",
       "fvg_absorption_pullback",
       "custom_structure",
+      "asian_session_liquidity_reversal",
     ])
     .optional(),
   symbol: z.string().min(2).max(12).default("XAUUSD"),
@@ -46,10 +47,10 @@ const RunSchema = z.object({
   endDate: z.string().optional(),
   initialBalance: z.number().min(1000).max(50_000_000).default(100000),
   riskPercent: z.number().min(0.1).max(5).default(0.75),
-  slAtrMultiple: z.number().min(0.5).max(5).default(1.4),
-  tpRiskMultiple: z.number().min(1.0).max(6).default(2.2),
-  spreadPoints: z.number().min(0).max(20).default(2.5),
-  commissionPerLot: z.number().min(0).max(50).default(7.0),
+  slAtrMultiple: z.number().min(0.1).default(1.4),
+  tpRiskMultiple: z.number().positive().default(2.2),
+  spreadPoints: z.number().min(0).default(2.5),
+  commissionPerLot: z.number().min(0).default(7.0),
   sessionFilter: z.enum(["ALL", "Asian", "London", "New York", "London+NY"]).default("ALL"),
 });
 
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
         tpRiskMultiple: d.tpRiskMultiple,
         spreadPoints: d.spreadPoints,
         commissionPerLot: d.commissionPerLot,
-        sessionFilter: d.sessionFilter,
+        sessionFilter: isAsianReversal ? "Asian" : d.sessionFilter,
         dataSource: `${series.source} · ${series.candles.length} historical bars`,
         isSimulated: true,
         totalTrades: result.totalTrades,
