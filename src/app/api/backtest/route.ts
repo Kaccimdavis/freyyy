@@ -46,7 +46,7 @@ const RunSchema = z.object({
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   initialBalance: z.number().min(1000).max(50_000_000).default(100000),
-  riskPercent: z.number().min(0.1).max(5).default(0.75),
+  riskPercent: z.number().min(0.01).max(5).default(0.75),
   slAtrMultiple: z.number().min(0.1).default(1.4),
   tpRiskMultiple: z.number().positive().default(2.2),
   spreadPoints: z.number().min(0).default(2.5),
