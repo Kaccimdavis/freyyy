@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     let emaFast = 12;
     let emaSlow = 30;
 
-    if (d.strategyId) {
+    if (d.strategyId && !isAsianReversal) {
       const found = await db
         .select()
         .from(strategies)
