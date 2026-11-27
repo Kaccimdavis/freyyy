@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     const d = parsed.data;
     const inst = getInstrument(d.symbol);
     let strategyId: number | null = null;
-    let strategyName = d.strategyName ?? "London Sweep & BOS Continuation";
+    let strategyName = d.strategyName ?? "London Sweep & BOS Continuation";\n    const isAsianReversal = d.logicType === "asian_session_liquidity_reversal";\n    if (isAsianReversal && (d.symbol !== "XAUUSD" || d.timeframe !== "5m")) {\n      return NextResponse.json({ error: "Asian Session Liquidity Reversal is restricted to XAUUSD M5." }, { status: 400 });\n    }\n    if (isAsianReversal) strategyName = "Asian Session Liquidity Reversal (Experimental)";
     let logicType: StrategyRuleSet["logicType"] = d.logicType ?? "liquidity_sweep_bos";
     let emaFast = 12;
     let emaSlow = 30;
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       tpRiskMultiple: d.tpRiskMultiple,
       spreadPoints: d.spreadPoints,
       commissionPerLot: d.commissionPerLot,
-      sessionFilter: d.sessionFilter,
+      sessionFilter: isAsianReversal ? "Asian" : d.sessionFilter,
       emaFast,
       emaSlow,
     });
