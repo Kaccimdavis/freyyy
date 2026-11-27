@@ -273,6 +273,23 @@ export function runHistoricalBacktest(input: BacktestInput): BacktestOutput {
       const bearCont = fast < slow && prev1.close > prev1.open && c.close < prev1.low && d3 < 0 && volStrong;
       if (bullOb || bullCont) signal = { dir: "BUY", reason: "Bullish order block reaction + positive CVD" };
       else if (bearOb || bearCont) signal = { dir: "SELL", reason: "Bearish order block rejection + negative CVD" };
+    } else if (logicType === "asian_session_liquidity_reversal") {
+      // Experimental Asian range sweep/reclaim. Build 00:00–03:00 UTC range;
+      // entries are permitted only after the range closes, from 03:00–09:00 UTC.
+      const utcHour = new Date(c.time).getUTCHours();
+      const dayStart = new Date(c.time);
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const dayStartMs = dayStart.getTime();
+      const rangeBars = candles.filter((bar, idx) => idx < i && bar.time >= dayStartMs && bar.time < dayStartMs + 3 * 3600_000);
+      if (rangeBars.length >= 6 && utcHour >= 3 && utcHour < 9) {
+        const asianHigh = Math.max(...rangeBars.map((bar) => bar.high));
+        const asianLow = Math.min(...rangeBars.map((bar) => bar.low));
+        const meaningfulRange = asianHigh - asianLow >= atr * 0.35;
+        const bullishReclaim = prev1.low < asianLow && prev1.close > asianLow && c.close > prev1.high && c.close > c.open;
+        const bearishReclaim = prev1.high > asianHigh && prev1.close < asianHigh && c.close < prev1.low && c.close < c.open;
+        if (meaningfulRange && bullishReclaim) signal = { dir: "BUY", reason: "Asian range low swept and reclaimed with bullish confirmation" };
+        else if (meaningfulRange && bearishReclaim) signal = { dir: "SELL", reason: "Asian range high swept and rejected with bearish confirmation" };
+      }
     } else if (logicType === "session_range_reversal") {
       // Swept recent swing range high/low returning inside range with opposite momentum
       const rangeSpan = localHigh - localLow;
