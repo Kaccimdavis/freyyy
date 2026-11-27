@@ -36,6 +36,7 @@ export interface DecisionEngineOutput {
   briefing: string;
   dataSource: string;
   dataStatus: DataStatus;
+  dataAgeSec: number;
   analyzedAt: string;
   h1Bias: "BULLISH" | "BEARISH" | "NEUTRAL";
   m15Structure: "BULLISH" | "BEARISH" | "RANGING";
@@ -116,7 +117,7 @@ export async function runMultiEngineAnalysis(params: {
   const inst = getInstrument(params.symbol ?? "XAUUSD");
   const symbol = inst.symbol;
   const dec = inst.decimals;
-  const threshold = Math.min(95, Math.max(80, params.confidenceThreshold ?? 80));
+  const threshold = Math.min(95, Math.max(70, params.confidenceThreshold ?? 70));
   const minRr = Math.max(1.2, params.minRiskReward ?? 1.8);
 
   // Run interconnected live engines in parallel
@@ -169,6 +170,7 @@ export async function runMultiEngineAnalysis(params: {
       briefing: `${symbol} market feed is currently unavailable. No trade signals or bias will be manufactured.`,
       dataSource: m15Res.source,
       dataStatus: "UNAVAILABLE",
+      dataAgeSec: Math.max(h1Res.cacheAgeSec, m15Res.cacheAgeSec),
       analyzedAt: new Date().toISOString(),
       h1Bias: "NEUTRAL",
       m15Structure: "RANGING",
@@ -226,8 +228,8 @@ export async function runMultiEngineAnalysis(params: {
   );
   const eventRiskElevated = in2Hours.length > 0;
 
-  // Weight breakdown across 5 engines (must total 100%)
-  // HTF Technical (25%) + Liquidity & Structure (30%) + ModFlow Order Flow (25%) + Execution Timing M5 (10%) + Macro/Session Clarity (10%)
+  // Supporting intelligence is context only; primary directional weight belongs to ModFlow order flow.
+  // Heatmap and VWAP are not yet implemented as independent live data feeds in this module.
   const liqSigned =
     (liqM15.trend === "BULLISH" ? 55 : liqM15.trend === "BEARISH" ? -55 : 0) +
     (liqM15.lastStructureEvent?.direction === "BULLISH" ? 28 : liqM15.lastStructureEvent?.direction === "BEARISH" ? -28 : 0) +
@@ -248,7 +250,8 @@ export async function runMultiEngineAnalysis(params: {
             : modflow.summary.cvdDivergence === "BEARISH_DIV"
               ? -24
               : 0) +
-          (currentPrice > modflow.volumeProfile.poc ? 14 : -14)
+          (currentPrice > modflow.volumeProfile.poc ? 14 : -14) +
+          (modflow.rollingVwap !== null ? (currentPrice > modflow.rollingVwap ? 10 : -10) : 0)
       )
     )
   );
@@ -264,8 +267,8 @@ export async function runMultiEngineAnalysis(params: {
 
   const engineBreakdown: EngineScoreItem[] = [
     {
-      engine: "Technical Engine (H1 Bias)",
-      weight: 25,
+      engine: "Supporting Confluence — H1 Trend",
+      weight: 10,
       bias: h1Tech.bias,
       score: Math.min(100, Math.round(50 + Math.abs(h1Tech.score) * 0.5)),
       summary: `H1 directional bias is ${h1Tech.bias}${h1Tech.ema20 ? ` · EMA20 ${formatPx(h1Tech.ema20, dec)}` : ""}${h1Tech.rsi14 !== null ? ` · RSI ${h1Tech.rsi14}` : ""}.`,
@@ -278,8 +281,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: h1Res.status === "SIMULATED" ? "CACHED" : h1Res.status,
     },
     {
-      engine: "Liquidity & Structure (M15)",
-      weight: 30,
+      engine: "Supporting Confluence — M15 Structure",
+      weight: 25,
       bias: liqM15.trend === "BULLISH" ? "BULLISH" : liqM15.trend === "BEARISH" ? "BEARISH" : "NEUTRAL",
       score: Math.min(100, Math.max(35, Math.round(45 + Math.abs(liqSigned) * 0.52))),
       summary: liqM15.structureBias,
@@ -290,8 +293,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: m15Res.status === "SIMULATED" ? "CACHED" : m15Res.status,
     },
     {
-      engine: "ModFlow Order Flow Engine",
-      weight: 25,
+      engine: "PRIMARY — ModFlow Order Flow",
+      weight: 55,
       bias: modflow.summary.bias,
       score: Math.min(100, Math.max(35, Math.round(48 + Math.abs(mfSigned) * 0.48))),
       summary: modflow.summary.confirmationText,
@@ -305,7 +308,7 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: modflow.status === "SIMULATED" ? "CACHED" : modflow.status,
     },
     {
-      engine: "Execution Engine (M5 Timing)",
+      engine: "Supporting Confluence — M5 Execution",
       weight: 10,
       bias: m5Tech.bias,
       score: Math.min(100, Math.round(50 + Math.abs(m5Tech.score) * 0.45)),
@@ -317,8 +320,8 @@ export async function runMultiEngineAnalysis(params: {
       dataStatus: m5Res.status === "SIMULATED" ? "CACHED" : m5Res.status,
     },
     {
-      engine: "Fundamental Calendar Guard",
-      weight: 10,
+      engine: "Macro / Session Risk Guard",
+      weight: 0,
       bias: "NEUTRAL",
       score: sessionQualityScore,
       summary:
@@ -338,12 +341,21 @@ export async function runMultiEngineAnalysis(params: {
     },
   ];
 
-  // Aggregate weighted directional consensus (-100 to +100)
+  // Primary decision authority is order flow. Structure, HTF and execution are supporting confluences.
+  // Order-flow telemetry currently includes candle-derived delta estimates; it is not equivalent to
+  // exchange-native bid/ask footprint data. Independent ModFlow validation remains mandatory before publication.
+  // Weights: ModFlow order flow 55%, M15 structure 25%, H1 context 10%, M5 timing 10%.
   const netDirectional =
-    h1Tech.score * 0.28 + liqSigned * 0.34 + mfSigned * 0.26 + m5Tech.score * 0.12;
+    mfSigned * 0.55 + liqSigned * 0.25 + h1Tech.score * 0.10 + m5Tech.score * 0.10;
 
+  // ModFlow owns the primary directional decision. Other engines may confirm or veto via disagreement,
+  // but they cannot manufacture a direction when the primary order-flow reading is neutral.
   const direction: DecisionEngineOutput["direction"] =
-    netDirectional >= 12 ? "BULLISH" : netDirectional <= -12 ? "BEARISH" : "NEUTRAL";
+    modflow.summary.bias === "BULLISH" && netDirectional >= 8
+      ? "BULLISH"
+      : modflow.summary.bias === "BEARISH" && netDirectional <= -8
+        ? "BEARISH"
+        : "NEUTRAL";
 
   // Count independent directional engine confirmations (strict anti-single-indicator rule)
   const dirEngines = engineBreakdown.slice(0, 4);
@@ -557,6 +569,7 @@ export async function runMultiEngineAnalysis(params: {
     briefing,
     dataSource: m15Res.source,
     dataStatus: m15Res.status,
+    dataAgeSec: m15Res.cacheAgeSec,
     analyzedAt: new Date().toISOString(),
     h1Bias: h1Tech.bias,
     m15Structure: liqM15.trend,

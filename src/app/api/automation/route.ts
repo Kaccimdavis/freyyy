@@ -175,26 +175,31 @@ export async function POST(req: NextRequest) {
     }
 
     if (d.action === "toggle_monitoring") {
-      if (cur.emergencyStopped && d.enabled) {
+      if (d.enabled) {
+        await db.insert(automationLogs).values({
+          userId: user.id,
+          action: "SIGNAL_MONITORING_BLOCKED",
+          status: "BLOCKED",
+          symbol: "XAUUSD",
+          detail: "Refused: this build does not yet have a scheduled autonomous signal scanner with independent ModFlow approval.",
+        });
         return NextResponse.json(
-          { error: "Clear Emergency Stop before enabling automated signal monitoring." },
-          { status: 409 }
+          { error: "Autonomous signal scanning is not installed yet. It will remain disabled until scheduled analysis and independent ModFlow validation are implemented." },
+          { status: 501 }
         );
       }
       const next: MasterState = {
         ...cur,
-        masterEnabled: d.enabled,
-        executionAuthorized: false, // signal monitoring NEVER implies auto order execution
+        masterEnabled: false,
+        executionAuthorized: false,
         lastToggledAt: new Date().toISOString(),
-        reason: d.enabled
-          ? "Signal monitoring active (read-only alerts only — zero broker trades placed automatically)."
-          : "Automated signal monitoring disabled.",
+        reason: "Autonomous signal scanning disabled; scheduled scanner and independent ModFlow approval are not yet implemented.",
       };
       await setMasterState(user.id, next);
       await db.insert(automationLogs).values({
         userId: user.id,
-        action: d.enabled ? "MONITORING_ENABLED" : "MONITORING_DISABLED",
-        status: d.enabled ? "MONITORED" : "CONFIG_UPDATED",
+        action: "MONITORING_DISABLED",
+        status: "CONFIG_UPDATED",
         symbol: "XAUUSD",
         detail: next.reason,
       });
@@ -202,35 +207,29 @@ export async function POST(req: NextRequest) {
     }
 
     if (d.action === "attempt_live_execution") {
-      if (d.enabled && !brokerReady) {
+      if (d.enabled) {
         await db.insert(automationLogs).values({
           userId: user.id,
           action: "AUTO_EXECUTION_BLOCKED",
           status: "BLOCKED",
           symbol: "ALL",
-          detail:
-            "Refused: no verified, explicitly authorized broker is configured.",
+          detail: "Refused: this build has no implemented MT5/broker order-placement adapter. Broker authorization flags alone cannot place or verify trades.",
         });
         return NextResponse.json(
-          {
-            error:
-              "Automated execution is locked. Verify and explicitly authorize a tested broker under Settings first.",
-          },
-          { status: 403 }
+          { error: "MT5 auto-execution is not implemented in this build. Connect a tested execution bridge before authorizing orders." },
+          { status: 501 }
         );
       }
       const next: MasterState = {
         ...cur,
-        executionAuthorized: d.enabled && brokerReady,
+        executionAuthorized: false,
         lastToggledAt: new Date().toISOString(),
-        reason: d.enabled
-          ? `Authorized execution connected via ${user.brokerConfig.provider} (${user.brokerConfig.environment === "demo" ? "Demo" : "Real"}).`
-          : "Execution switched off by operator.",
+        reason: "Execution disabled. This build does not contain a broker order-placement adapter.",
       };
       await setMasterState(user.id, next);
       await db.insert(automationLogs).values({
         userId: user.id,
-        action: d.enabled ? "EXECUTION_AUTHORIZED" : "EXECUTION_DISABLED",
+        action: "EXECUTION_DISABLED",
         status: "CONFIG_UPDATED",
         symbol: "ALL",
         detail: next.reason,

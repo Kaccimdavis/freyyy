@@ -109,11 +109,9 @@ export function SignalsView({ timezone, monitorTick, gold, onMarkets, navigation
   const [now, setNow] = useState(() => Date.now());
   const [notice, setNotice] = useState("");
   const [publishing, setPublishing] = useState(false);
-  const [manual, setManual] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [auditError, setAuditError] = useState("");
   const [updating, setUpdating] = useState(false);
-  const [manualError, setManualError] = useState("");
   const [journal, setJournal] = useState<{ entries: PerformanceEntry[]; desk: boolean }>();
   const [performanceError, setPerformanceError] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -165,31 +163,20 @@ export function SignalsView({ timezone, monitorTick, gold, onMarkets, navigation
   const unavailable = !data || Boolean(open) || data.cooldown.hasOpen || remaining > 0;
   const row = tab === "active" ? open : undefined;
 
-  async function publish(body: Record<string, unknown>, inForm = false) {
+  async function publish(body: Record<string, unknown>) {
     setPublishing(true);
     setNotice("");
-    setManualError("");
     try {
       const res = await fetch("/api/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const result = await res.json();
       if (!res.ok) { if (res.status === 409 || res.status === 429) await load(); throw new Error(result.error ?? "Couldn’t publish the signal."); }
-      setManual(false);
       setTab("active");
       setNotice("Signal published. Original levels are locked.");
       await load();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Couldn’t publish the signal.";
-      if (inForm) setManualError(message); else setNotice(message);
+      setNotice(message);
     } finally { setPublishing(false); }
-  }
-
-  async function handleManual(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const text = (key: string) => String(form.get(key) ?? "");
-    await publish({ mode: "manual", symbol: text("symbol"), direction: text("direction"), timeframe: text("timeframe"),
-      entryPrice: Number(text("entry")), stopLoss: Number(text("stop")), takeProfit: Number(text("target")),
-      confidence: Number(text("confidence")), strategyName: text("strategy"), marketConditions: text("context"), confirmations: text("evidence").split("\n").map((item) => item.trim()).filter(Boolean), invalidationRule: text("invalidation"), initialStatus: "PENDING" }, true);
   }
 
   async function recordUpdate(event: React.FormEvent<HTMLFormElement>) {
@@ -239,7 +226,6 @@ export function SignalsView({ timezone, monitorTick, gold, onMarkets, navigation
         <p><strong className="font-semibold text-ink">No active signal.</strong>{remaining > 0 && <> Next evaluation in <span className="font-medium tabular-nums text-ink">{countdown(remaining)}</span>.</>}</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" size="sm" disabled={unavailable || publishing} onClick={() => void publish({ mode: "ai", symbol: "XAUUSD" })}>{publishing ? "Checking setup…" : "Evaluate gold setup"}</Button>
-          <Button variant="ghost" size="sm" disabled={unavailable || publishing} onClick={() => { setManualError(""); setManual(true); }}>Publish manually</Button>
         </div>
       </>}
     </section>}
@@ -291,25 +277,6 @@ export function SignalsView({ timezone, monitorTick, gold, onMarkets, navigation
           </form>
         </details>}
       </div>}
-    </ModalSheet>
-    <ModalSheet open={manual} onClose={() => setManual(false)} title="Publish a signal" subtitle="Original levels lock when published. Tracking stops at three hours.">
-      <form onSubmit={handleManual} className="space-y-3.5">
-        {manualError && <ErrorBanner message={manualError} />}
-        <div className="grid grid-cols-3 gap-2">
-          <label><span className={LABEL_CLS}>Market</span><select className={INPUT_CLS} name="symbol" defaultValue="XAUUSD">{Object.keys(MARKET_META).map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span className={LABEL_CLS}>Direction</span><select name="direction" className={INPUT_CLS}><option value="BUY">Buy</option><option value="SELL">Sell</option></select></label>
-          <label><span className={LABEL_CLS}>Timeframe</span><select name="timeframe" className={INPUT_CLS} defaultValue="15m">{["3m", "5m", "15m", "1h", "4h", "1d"].map((value) => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[["entry", "Entry"], ["stop", "Stop loss"], ["target", "Take profit"]].map(([name, label]) => <label key={name}><span className={LABEL_CLS}>{label}</span><input required name={name} type="number" step="any" min="0.00000001" className={INPUT_CLS} /></label>)}
-          <label><span className={LABEL_CLS}>Strategy</span><input name="strategy" required minLength={2} maxLength={120} className={INPUT_CLS} /></label>
-          <label><span className={LABEL_CLS}>Confidence (%)</span><input name="confidence" required type="number" min="30" max="95" className={INPUT_CLS} /></label>
-        </div>
-        <label className="block"><span className={LABEL_CLS}>Market context</span><input name="context" required minLength={4} maxLength={500} className={INPUT_CLS} /></label>
-        <label className="block"><span className={LABEL_CLS}>Confirmations · at least two, one per line</span><textarea name="evidence" required rows={2} className={cn(INPUT_CLS, "h-auto py-2")} /></label>
-        <label className="block"><span className={LABEL_CLS}>Invalidation rule</span><input name="invalidation" required minLength={4} maxLength={300} className={INPUT_CLS} /></label>
-        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => setManual(false)}>Cancel</Button><Button type="submit" variant="primary" disabled={publishing || unavailable}>{publishing ? "Publishing…" : "Publish"}</Button></div>
-      </form>
     </ModalSheet>
   </div>;
 }

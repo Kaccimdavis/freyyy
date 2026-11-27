@@ -128,7 +128,8 @@ export function AutomationView({
   if (loading || !data) return <PanelSkeleton rows={7} />;
 
   const { master, broker, rules, logs } = data;
-  const brokerAuthorized = broker.connected && broker.verified && broker.authorizedForAuto;
+  // This repository currently has no MT5/broker order-placement adapter. UI authorization must stay locked.
+  const brokerAuthorized = false;
 
   return (
     <div className="space-y-4">
@@ -152,16 +153,16 @@ export function AutomationView({
               ) : (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-ink/12 bg-ink/[0.05] px-2.5 py-0.5 text-[10.5px] font-medium text-ink">
                   <Lock className="h-3 w-3 text-ink-secondary" />
-                  Auto-Execution: {master.executionAuthorized ? "Authorized" : "Disabled (Safe Default)"}
+                  Auto-Execution: Not implemented
                 </span>
               )}
               <span className="font-mono text-[10.5px] text-ink-secondary">
-                Monitoring: {master.masterEnabled ? "ACTIVE" : "OFF"}
+                Autonomous scanner: NOT INSTALLED
               </span>
             </div>
             <p className="mt-2 text-[12.5px] text-ink-secondary">{cleanCopy(master.reason)}</p>
             <p className="mt-1 text-[11px] text-ink-tertiary">
-              Broker: {broker.provider} · Updated {formatDateTime(master.lastToggledAt, timezone, { short: true })}
+              Broker profile: {broker.provider} · MT5 order bridge not installed · Updated {formatDateTime(master.lastToggledAt, timezone, { short: true })}
             </p>
           </div>
 
@@ -183,13 +184,13 @@ export function AutomationView({
           <div className="freyr-card flex items-center justify-between gap-3 px-4 py-3">
             <div>
               <div className="text-[12.5px] font-medium text-ink">Automated Signal Monitoring</div>
-              <p className="text-[11px] text-ink-secondary">Read-only setup evaluation & notifications. Places zero trades.</p>
+              <p className="text-[11px] text-ink-secondary">Not available yet. Scheduled scanning and independent ModFlow approval are not installed.</p>
             </div>
             <Switch
-              checked={master.masterEnabled}
-              disabled={master.emergencyStopped}
-              onChange={(v) => send({ action: "toggle_monitoring", enabled: v })}
-              label="Toggle automated signal monitoring"
+              checked={false}
+              disabled
+              onChange={() => undefined}
+              label="Autonomous scanner not installed"
             />
           </div>
 
@@ -201,8 +202,8 @@ export function AutomationView({
               </div>
               <p className="text-[11px] text-ink-secondary">
                 {brokerAuthorized
-                  ? `Explicitly authorized via ${broker.provider} (${broker.environment === "demo" ? "Demo" : "Real"}).`
-                  : "Blocked until a verified broker integration is authorized in Settings."}
+                  ? `Execution adapter verified via ${broker.provider}.`
+                  : "Not available: no MT5 order-placement bridge is installed. This control cannot place trades."}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -212,9 +213,10 @@ export function AutomationView({
                 </Button>
               )}
               <Switch
-                checked={master.executionAuthorized}
-                onChange={(v) => send({ action: "attempt_live_execution", enabled: v })}
-                label="Toggle automated execution"
+                checked={false}
+                disabled
+                onChange={() => undefined}
+                label="MT5 auto-execution unavailable until an execution bridge is installed"
               />
             </div>
           </div>

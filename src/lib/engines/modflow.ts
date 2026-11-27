@@ -53,6 +53,8 @@ export interface ModFlowAnalysis {
   validatedBars: number;
   fetchedAt: string;
   currentPrice: number;
+  rollingVwap: number | null;
+  vwapDeviationPct: number | null;
   summary: {
     bias: "BULLISH" | "BEARISH" | "NEUTRAL";
     setupConfirmation: "CONFIRMED_BUY" | "CONFIRMED_SELL" | "NEUTRAL" | "DIVERGENT";
@@ -141,6 +143,9 @@ export function runModFlowAnalysis(params: {
   }
 
   const hasVolume = bars.some((b) => b.volume > 0);
+  if (hasVolume) {
+    validationNotes.push("Delta/CVD buy-sell splits are estimated from candle OHLC position and total candle volume; they are not exchange-native bid/ask footprint prints.");
+  }
   if (!hasVolume && bars.length > 0) {
     validationNotes.push(
       "Reference venue reports zero volume on FX/index feed; directional pressure estimated from candle close position and explicitly constrained."
@@ -270,6 +275,14 @@ export function runModFlowAnalysis(params: {
     orderBook.status !== "UNAVAILABLE" && orderBook.midPrice > 0
       ? orderBook.midPrice
       : bars[bars.length - 1]?.close ?? 0;
+
+  const vwapVolume = bars.reduce((sum, bar) => sum + bar.volume, 0);
+  const rollingVwap = vwapVolume > 0
+    ? bars.reduce((sum, bar) => sum + ((bar.high + bar.low + bar.close) / 3) * bar.volume, 0) / vwapVolume
+    : null;
+  const vwapDeviationPct = rollingVwap !== null && rollingVwap > 0
+    ? ((currentPrice - rollingVwap) / rollingVwap) * 100
+    : null;
 
   let poc = currentPrice;
   let vah = currentPrice;
@@ -461,10 +474,10 @@ export function runModFlowAnalysis(params: {
     confirmationText = "Bearish CVD divergence detected: price moved higher on weakening cumulative delta and passive sell resistance.";
   } else if (bias === "BULLISH") {
     setupConfirmation = "CONFIRMED_BUY";
-    confirmationText = `Aggressive buyers hold ${aggressiveBuyPct.toFixed(1)}% of recent tape${orderBook.status !== "UNAVAILABLE" ? ` with ${bidPressurePct.toFixed(1)}% L2 bid depth` : ""}; confirms long execution above VAL.`;
+    confirmationText = `Estimated candle-volume buying pressure is ${aggressiveBuyPct.toFixed(1)}%${orderBook.status !== "UNAVAILABLE" ? ` with ${bidPressurePct.toFixed(1)}% L2 bid depth` : ""}; confirm with independent trade-level order flow before execution.`;
   } else if (bias === "BEARISH") {
     setupConfirmation = "CONFIRMED_SELL";
-    confirmationText = `Aggressive sellers hold ${aggressiveSellPct.toFixed(1)}% of recent tape${orderBook.status !== "UNAVAILABLE" ? ` with ${askPressurePct.toFixed(1)}% L2 ask depth` : ""}; confirms short execution below VAH.`;
+    confirmationText = `Estimated candle-volume selling pressure is ${aggressiveSellPct.toFixed(1)}%${orderBook.status !== "UNAVAILABLE" ? ` with ${askPressurePct.toFixed(1)}% L2 ask depth` : ""}; confirm with independent trade-level order flow before execution.`;
   }
 
   const priceLocation: ModFlowAnalysis["volumeProfile"]["priceLocation"] =
@@ -479,6 +492,8 @@ export function runModFlowAnalysis(params: {
     validatedBars: bars.length,
     fetchedAt: new Date().toISOString(),
     currentPrice,
+    rollingVwap: rollingVwap !== null ? Number(rollingVwap.toFixed(6)) : null,
+    vwapDeviationPct: vwapDeviationPct !== null ? Number(vwapDeviationPct.toFixed(4)) : null,
     summary: {
       bias,
       setupConfirmation,
