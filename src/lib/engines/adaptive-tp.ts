@@ -22,7 +22,7 @@ export function calculateAdaptiveTakeProfit(input: AdaptiveTakeProfitInput): Ada
   if (![entry, stopLoss, atr, input.momentumScore, input.volatilityPct].every(Number.isFinite) || entry <= 0 || atr <= 0) return null;
   const risk = Math.abs(entry - stopLoss);
   if (risk <= 0 || (side === "BUY" ? stopLoss >= entry : stopLoss <= entry)) return null;
-  const minR = clamp(input.minRiskReward ?? 1.5, 1.2, 6);
+  const minR = Math.max(0.1, input.minRiskReward ?? 1.5);
   const momentumScore = clamp(input.momentumScore, 0, 100);
   const momentumFactor = 1 + (momentumScore / 100) * 0.9;
   // Normalize volatility around 0.25% ATR/price; dampen extremes rather than rewarding volatility blindly.
