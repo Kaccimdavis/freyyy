@@ -52,6 +52,7 @@ export function RiskView() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actualBalance, setActualBalance] = useState("");
 
   // Editable persisted policy state
   const [policy, setPolicy] = useState({
@@ -80,6 +81,8 @@ export function RiskView() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j: RiskPayload = await res.json();
       setData(j);
+      const savedActualBalance = typeof window !== "undefined" ? window.localStorage.getItem("freyr-calculator-actual-balance") : null;
+      setActualBalance(savedActualBalance && Number(savedActualBalance) > 0 ? savedActualBalance : String(j.config.accountEquity));
       setPolicy({
         accountBalance: String(j.config.accountBalance),
         riskPerTradePct: String(j.config.riskPerTradePct),
@@ -172,7 +175,8 @@ export function RiskView() {
     entry > 0 &&
     stopDist > 0 &&
     (calc.direction === "BUY" ? sl < entry && tp > entry : sl > entry && tp < entry);
-  const riskUsd = c.accountEquity * (rPct / 100);
+  const calculatorBalance = Number(actualBalance) > 0 ? Number(actualBalance) : c.accountEquity;
+  const riskUsd = calculatorBalance * (rPct / 100);
   const positionLots = validGeom ? riskUsd / (stopDist * spec.contractSize) : 0;
   const positionUnits = positionLots * spec.contractSize;
   const rr = validGeom ? rewardDist / stopDist : 0;
@@ -260,7 +264,23 @@ export function RiskView() {
       {/* Position Sizing & Risk-Reward Calculator + Policy Form */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-7">
-          <Panel title="Position Sizing, Lot Size & R:R Calculator" subtitle={`Contract size: ${spec.unit} · Auto-anchored to account equity`}>
+          <Panel title="Position Sizing, Lot Size & R:R Calculator" subtitle={`Contract size: ${spec.unit} · Uses your manually entered account balance`}>
+            <div className="mb-3 rounded-xl border border-outline bg-inset/60 p-3">
+              <label className={LABEL_CLS}>Your Actual Account Balance (USD)</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={actualBalance}
+                onChange={(e) => {
+                  setActualBalance(e.target.value);
+                  if (typeof window !== "undefined") window.localStorage.setItem("freyr-calculator-actual-balance", e.target.value);
+                }}
+                placeholder="Enter your current real balance"
+                className={cn(INPUT_CLS, "font-mono text-base")}
+              />
+              <p className="mt-1.5 text-[10.5px] text-ink-secondary">This balance controls the calculator’s position size and estimated risk/reward. It does not change your saved risk-governance balance or live account data.</p>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div>
                 <label className={LABEL_CLS}>Instrument</label>
