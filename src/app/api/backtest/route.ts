@@ -67,7 +67,12 @@ export async function POST(req: NextRequest) {
     const d = parsed.data;
     const inst = getInstrument(d.symbol);
     let strategyId: number | null = null;
-    let strategyName = d.strategyName ?? "London Sweep & BOS Continuation";\n    const isAsianReversal = d.logicType === "asian_session_liquidity_reversal";\n    if (isAsianReversal && (d.symbol !== "XAUUSD" || d.timeframe !== "5m")) {\n      return NextResponse.json({ error: "Asian Session Liquidity Reversal is restricted to XAUUSD M5." }, { status: 400 });\n    }\n    if (isAsianReversal) strategyName = "Asian Session Liquidity Reversal (Experimental)";
+    let strategyName = d.strategyName ?? "London Sweep & BOS Continuation";
+    const isAsianReversal = d.logicType === "asian_session_liquidity_reversal";
+    if (isAsianReversal && (d.symbol !== "XAUUSD" || d.timeframe !== "5m")) {
+      return NextResponse.json({ error: "Asian Session Liquidity Reversal is restricted to XAUUSD M5." }, { status: 400 });
+    }
+    if (isAsianReversal) strategyName = "Asian Session Liquidity Reversal (Experimental)";
     let logicType: StrategyRuleSet["logicType"] = d.logicType ?? "liquidity_sweep_bos";
     let emaFast = 12;
     let emaSlow = 30;
