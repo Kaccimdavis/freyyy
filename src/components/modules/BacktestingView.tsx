@@ -79,15 +79,20 @@ export function BacktestingView({
   const [reverseResult, setReverseResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const monthAgo = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+  const [dateDefaults] = useState(() => {
+    const now = new Date();
+    return {
+      today: now.toISOString().slice(0, 10),
+      monthAgo: new Date(now.getTime() - 30 * 86400_000).toISOString().slice(0, 10),
+    };
+  });
 
   const [cfg, setCfg] = useState({
     strategyId: initialStrategyId ? String(initialStrategyId) : "",
     symbol: initialSymbol || "XAUUSD",
     timeframe: "1h",
-    startDate: monthAgo,
-    endDate: today,
+    startDate: dateDefaults.monthAgo,
+    endDate: dateDefaults.today,
     initialBalance: "100000",
     riskPercent: "0.75",
     slAtrMultiple: "1.4",
@@ -96,12 +101,6 @@ export function BacktestingView({
     commissionPerLot: "7",
     sessionFilter: "ALL",
   });
-
-  useEffect(() => {
-    if (initialStrategyId) {
-      setCfg((p) => ({ ...p, strategyId: String(initialStrategyId), symbol: initialSymbol || p.symbol }));
-    }
-  }, [initialStrategyId, initialSymbol]);
 
   const load = useCallback(async () => {
     try {
@@ -121,7 +120,8 @@ export function BacktestingView({
   }, []);
 
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const execute = async (e: React.FormEvent) => {
