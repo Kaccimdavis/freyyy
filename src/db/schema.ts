@@ -108,7 +108,7 @@ export interface StrategyRuleSet {
   exitConditions: string[];
   confirmations: string[];
   invalidationConditions: string[];
-  logicType: "liquidity_sweep_bos" | "ob_cvd_confluence" | "session_range_reversal" | "fvg_absorption_pullback" | "custom_structure";
+  logicType: "liquidity_sweep_bos" | "ob_cvd_confluence" | "session_range_reversal" | "fvg_absorption_pullback" | "custom_structure" | "asian_session_liquidity_reversal";
   slAtrMultiple: number;
   tpRiskMultiple: number;
   emaFast: number;

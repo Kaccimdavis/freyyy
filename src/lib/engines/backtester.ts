@@ -148,6 +148,25 @@ export function runHistoricalBacktest(input: BacktestInput): BacktestOutput {
     { time: candles[0].time, equity: round(equity), drawdownPct: 0 },
   ];
 
+  // Precompute the completed 00:00–03:00 UTC Asian range once per day.
+  // The strategy only reads it from 03:00 UTC onward, avoiding look-ahead.
+  const asianRangeByDay = new Map<number, { high: number; low: number; count: number }>();
+  if (logicType === "asian_session_liquidity_reversal") {
+    for (const bar of candles) {
+      const day = new Date(bar.time);
+      day.setUTCHours(0, 0, 0, 0);
+      const dayStart = day.getTime();
+      const hour = new Date(bar.time).getUTCHours();
+      if (hour >= 3) continue;
+      const existing = asianRangeByDay.get(dayStart);
+      asianRangeByDay.set(dayStart, {
+        high: Math.max(existing?.high ?? -Infinity, bar.high),
+        low: Math.min(existing?.low ?? Infinity, bar.low),
+        count: (existing?.count ?? 0) + 1,
+      });
+    }
+  }
+
   // Spread normalized to instrument price scale
   const spreadPx = spreadPoints * inst.pipSize;
   const startIdx = Math.max(22, slowP);
@@ -273,6 +292,23 @@ export function runHistoricalBacktest(input: BacktestInput): BacktestOutput {
       const bearCont = fast < slow && prev1.close > prev1.open && c.close < prev1.low && d3 < 0 && volStrong;
       if (bullOb || bullCont) signal = { dir: "BUY", reason: "Bullish order block reaction + positive CVD" };
       else if (bearOb || bearCont) signal = { dir: "SELL", reason: "Bearish order block rejection + negative CVD" };
+    } else if (logicType === "asian_session_liquidity_reversal") {
+      // Experimental Asian range sweep/reclaim. Build 00:00–03:00 UTC range;
+      // entries are permitted only after the range closes, from 03:00–09:00 UTC.
+      const utcHour = new Date(c.time).getUTCHours();
+      const dayStart = new Date(c.time);
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const dayStartMs = dayStart.getTime();
+      const completedRange = asianRangeByDay.get(dayStartMs);
+      if (completedRange && completedRange.count >= 6 && utcHour >= 3 && utcHour < 9) {
+        const asianHigh = completedRange.high;
+        const asianLow = completedRange.low;
+        const meaningfulRange = asianHigh - asianLow >= atr * 0.35;
+        const bullishReclaim = prev1.low < asianLow && prev1.close > asianLow && c.close > prev1.high && c.close > c.open;
+        const bearishReclaim = prev1.high > asianHigh && prev1.close < asianHigh && c.close < prev1.low && c.close < c.open;
+        if (meaningfulRange && bullishReclaim) signal = { dir: "BUY", reason: "Asian range low swept and reclaimed with bullish confirmation" };
+        else if (meaningfulRange && bearishReclaim) signal = { dir: "SELL", reason: "Asian range high swept and rejected with bearish confirmation" };
+      }
     } else if (logicType === "session_range_reversal") {
       // Swept recent swing range high/low returning inside range with opposite momentum
       const rangeSpan = localHigh - localLow;
