@@ -113,7 +113,8 @@ function snapshot(candles: Candle[]): StrategyLearningFeatures | null {
 }
 
 function buildSeparation(rows: StrategyLearningRow[]): FeatureSeparation[] {
-  const keys: (keyof StrategyLearningFeatures)[] = [
+  type NumericFeature = Exclude<keyof StrategyLearningFeatures, "trend">;
+  const keys: NumericFeature[] = [
     "emaSpreadAtr", "atrPercent", "momentum3Atr", "candleBodyToRange",
     "upperWickToRange", "lowerWickToRange", "rangeExpansion", "closeLocation",
     "distanceTo20BarHighAtr", "distanceTo20BarLowAtr",
