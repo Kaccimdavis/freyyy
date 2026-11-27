@@ -133,7 +133,8 @@ export function BacktestingView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          strategyId: cfg.strategyId && cfg.strategyId !== "asian_session_liquidity_reversal" ? Number(cfg.strategyId) : undefined,\n          ...(cfg.strategyId === "asian_session_liquidity_reversal" ? { strategyName: "Asian Session Liquidity Reversal (Experimental)", logicType: "asian_session_liquidity_reversal" } : {}),
+          strategyId: cfg.strategyId && cfg.strategyId !== "asian_session_liquidity_reversal" ? Number(cfg.strategyId) : undefined,
+          ...(cfg.strategyId === "asian_session_liquidity_reversal" ? { strategyName: "Asian Session Liquidity Reversal (Experimental)", logicType: "asian_session_liquidity_reversal" } : {}),
           symbol: cfg.symbol,
           timeframe: cfg.timeframe,
           startDate: cfg.startDate,
@@ -197,7 +198,8 @@ export function BacktestingView({
               <div>
                 <label className={LABEL_CLS}>Strategy</label>
                 <select value={cfg.strategyId} onChange={(e) => { const value = e.target.value; setCfg({ ...cfg, strategyId: value, ...(value === "asian_session_liquidity_reversal" ? { symbol: "XAUUSD", timeframe: "5m", riskPercent: "2", slAtrMultiple: "2", tpRiskMultiple: "4", commissionPerLot: "3", sessionFilter: "Asian" } : {}) }); }} className={INPUT_CLS}>
-                  <option value="asian_session_liquidity_reversal">Asian Session Liquidity Reversal · Experimental</option>\n                  {strategies.map((s) => (
+                  <option value="asian_session_liquidity_reversal">Asian Session Liquidity Reversal · Experimental</option>
+                  {strategies.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
