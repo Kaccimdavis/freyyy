@@ -239,32 +239,32 @@ export function BacktestingView({
                 </div>
                 <div>
                   <label className={LABEL_CLS}>Risk / Trade (%)</label>
-                  <input type="number" min={0.1} max={5} step={0.1} value={cfg.riskPercent} onChange={(e) => setCfg({ ...cfg, riskPercent: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
+                  <input type="number" min={0.01} max={5} step={0.01} value={cfg.riskPercent} onChange={(e) => setCfg({ ...cfg, riskPercent: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className={LABEL_CLS}>Stop Loss (× ATR)</label>
-                  <input type="number" min={0.5} max={5} step={0.1} value={cfg.slAtrMultiple} onChange={(e) => setCfg({ ...cfg, slAtrMultiple: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
+                  <input type="number" min={0.1} step={0.1} value={cfg.slAtrMultiple} onChange={(e) => setCfg({ ...cfg, slAtrMultiple: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
                 </div>
                 <div>
                   <label className={LABEL_CLS}>Take Profit (× Risk)</label>
-                  <input type="number" min={1.0} max={6} step={0.1} value={cfg.tpRiskMultiple} onChange={(e) => setCfg({ ...cfg, tpRiskMultiple: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
+                  <input type="number" min={0.1} step={0.1} value={cfg.tpRiskMultiple} onChange={(e) => setCfg({ ...cfg, tpRiskMultiple: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className={LABEL_CLS}>Spread (pips/pts)</label>
-                  <input type="number" min={0} max={20} step={0.5} value={cfg.spreadPoints} onChange={(e) => setCfg({ ...cfg, spreadPoints: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
+                  <input type="number" min={0} step={0.1} value={cfg.spreadPoints} onChange={(e) => setCfg({ ...cfg, spreadPoints: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
                 </div>
                 <div>
                   <label className={LABEL_CLS}>Commission ($/lot)</label>
-                  <input type="number" min={0} max={50} step={0.5} value={cfg.commissionPerLot} onChange={(e) => setCfg({ ...cfg, commissionPerLot: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
+                  <input type="number" min={0} step={0.1} value={cfg.commissionPerLot} onChange={(e) => setCfg({ ...cfg, commissionPerLot: e.target.value })} className={cn(INPUT_CLS, "font-mono")} />
                 </div>
               </div>
               <div>
                 <label className={LABEL_CLS}>Trading Session Filter</label>
-                <select value={cfg.sessionFilter} onChange={(e) => setCfg({ ...cfg, sessionFilter: e.target.value })} className={INPUT_CLS}>
+                <select value={cfg.strategyId === "asian_session_liquidity_reversal" ? "Asian" : cfg.sessionFilter} disabled={cfg.strategyId === "asian_session_liquidity_reversal"} onChange={(e) => setCfg({ ...cfg, sessionFilter: e.target.value })} className={INPUT_CLS}>
                   <option value="ALL">All Sessions (24h)</option>
                   <option value="London+NY">London + New York Only</option>
                   <option value="London">London Session (07–16 UTC)</option>
