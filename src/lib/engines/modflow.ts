@@ -15,6 +15,87 @@ export interface DeltaBar {
   exhaustion: "BUY_EXHAUSTION" | "SELL_EXHAUSTION" | null;
 }
 
+export type FootprintConfluenceKey =
+  | "deltaFlip"
+  | "deltaSurge"
+  | "deltaTransition"
+  | "deltaAbsorption"
+  | "cumulativeDelta";
+
+export interface FootprintConfluenceReading {
+  key: FootprintConfluenceKey;
+  label: string;
+  triggered: boolean;
+  direction: "BULLISH" | "BEARISH" | "NEUTRAL";
+  strength: number;
+  evidence: string;
+  dataBasis: "CANDLE_DERIVED_ESTIMATE";
+}
+
+function detectFootprintConfluences(deltaBars: DeltaBar[]): FootprintConfluenceReading[] {
+  const neutral = (key: FootprintConfluenceKey, label: string, evidence: string): FootprintConfluenceReading => ({
+    key, label, triggered: false, direction: "NEUTRAL", strength: 0, evidence,
+    dataBasis: "CANDLE_DERIVED_ESTIMATE",
+  });
+  const latest = deltaBars[deltaBars.length - 1];
+  const prior = deltaBars[deltaBars.length - 2];
+  const last3 = deltaBars.slice(-3);
+  const last4 = deltaBars.slice(-4);
+  const last6 = deltaBars.slice(-6);
+  const sign = (value: number) => value > 0 ? 1 : value < 0 ? -1 : 0;
+  const direction = (value: number): "BULLISH" | "BEARISH" | "NEUTRAL" =>
+    value > 0 ? "BULLISH" : value < 0 ? "BEARISH" : "NEUTRAL";
+  const priceDirection = latest && prior ? sign(latest.close - prior.close) : 0;
+
+  const flip = latest && prior && sign(latest.delta) !== 0 && sign(prior.delta) !== 0 &&
+    sign(latest.delta) !== sign(prior.delta) && sign(latest.delta) === priceDirection &&
+    Math.abs(latest.delta) >= Math.abs(prior.delta) * 0.75;
+  const flipReading = flip
+    ? { ...neutral("deltaFlip", "Delta Flip", "Estimated delta changed sign and the latest candle closed in the new direction."),
+        triggered: true, direction: direction(latest.delta), strength: Math.min(90, Math.round(60 + Math.abs(latest.delta) / Math.max(1, latest.totalVolume) * 30)) }
+    : neutral("deltaFlip", "Delta Flip", "No confirmed sign change with matching price response in the latest two bars.");
+
+  const surgeSide = last3.length === 3 ? sign(last3[0].delta) : 0;
+  const surge = surgeSide !== 0 && last3.every((bar) => sign(bar.delta) === surgeSide) &&
+    Math.abs(last3[1].delta) > Math.abs(last3[0].delta) * 1.08 &&
+    Math.abs(last3[2].delta) > Math.abs(last3[1].delta) * 1.08 &&
+    sign(last3[2].close - last3[0].close) === surgeSide;
+  const surgeReading = surge
+    ? { ...neutral("deltaSurge", "Delta Surge", "Estimated delta magnitude expanded across three consecutive bars with price displacement in the same direction."),
+        triggered: true, direction: direction(surgeSide), strength: 75 }
+    : neutral("deltaSurge", "Delta Surge", "No three-bar expansion in estimated delta with matching price displacement.");
+
+  const transitionBase = last4.slice(0, 3);
+  const transitionSide = transitionBase.length === 3 ? sign(transitionBase[0].delta) : 0;
+  const transition = transitionSide !== 0 &&
+    transitionBase.every((bar) => sign(bar.delta) === transitionSide) &&
+    Math.abs(transitionBase[1].delta) < Math.abs(transitionBase[0].delta) &&
+    Math.abs(transitionBase[2].delta) < Math.abs(transitionBase[1].delta) &&
+    sign(latest?.delta ?? 0) === -transitionSide &&
+    priceDirection === -transitionSide;
+  const transitionReading = transition
+    ? { ...neutral("deltaTransition", "Delta Transition", "Prior-side estimated aggression weakened over three bars before opposite-side pressure emerged with price confirmation."),
+        triggered: true, direction: direction(-transitionSide), strength: 72 }
+    : neutral("deltaTransition", "Delta Transition", "No weakening three-bar pressure sequence followed by a confirmed opposing delta bar.");
+
+  const absorptionSide = latest?.absorption === "BULL_ABSORPTION" ? "BULLISH" :
+    latest?.absorption === "BEAR_ABSORPTION" ? "BEARISH" : "NEUTRAL";
+  const absorptionReading = absorptionSide !== "NEUTRAL"
+    ? { ...neutral("deltaAbsorption", "Delta Absorption", "High relative candle volume, compressed body and a defended wick suggest possible absorption; aggressor side is not verified."),
+        triggered: true, direction: absorptionSide, strength: 65 }
+    : neutral("deltaAbsorption", "Delta Absorption", "No candle-proxy absorption pattern detected on the latest bar.");
+
+  const cvdMove = last6.length >= 4 ? last6[last6.length - 1].cvd - last6[0].cvd : 0;
+  const priceMove = last6.length >= 4 ? last6[last6.length - 1].close - last6[0].close : 0;
+  const cvdConfirmed = sign(cvdMove) !== 0 && sign(cvdMove) === sign(priceMove);
+  const cvdReading = cvdConfirmed
+    ? { ...neutral("cumulativeDelta", "Cumulative Delta", "Estimated cumulative delta direction agrees with price movement across the recent window."),
+        triggered: true, direction: direction(cvdMove), strength: 62 }
+    : neutral("cumulativeDelta", "Cumulative Delta", "Estimated cumulative delta does not confirm the recent price direction.");
+
+  return [flipReading, surgeReading, transitionReading, absorptionReading, cvdReading];
+}
+
 export interface VolumeProfileBucket {
   priceLow: number;
   priceHigh: number;
@@ -86,6 +167,7 @@ export interface ModFlowAnalysis {
     buckets: VolumeProfileBucket[];
   };
   deltaBars: DeltaBar[];
+  confluences: FootprintConfluenceReading[];
   events: OrderFlowEvent[];
   walls: OrderBookWall[];
   orderBook: OrderBookSnapshot;
@@ -146,6 +228,7 @@ export function runModFlowAnalysis(params: {
       "Reference venue reports zero volume on FX/index feed; directional pressure estimated from candle close position and explicitly constrained."
     );
   }
+  validationNotes.push("Footprint confluences are currently candle-derived estimates, not exchange-classified aggressor-side trade prints. Treat them as proxy evidence only.");
   if (orderBook.status === "UNAVAILABLE") {
     validationNotes.push("L2 order book unavailable for this instrument; book pressure excluded from weighting.");
   } else if (orderBook.status === "CACHED") {
@@ -424,6 +507,7 @@ export function runModFlowAnalysis(params: {
     }
   }
 
+  const confluences = detectFootprintConfluences(deltaBars);
   const absorptionCount = deltaBars.filter((d) => d.absorption !== null).length;
   const exhaustionCount = deltaBars.filter((d) => d.exhaustion !== null).length;
   const recentEvents = events.slice(-14).reverse();
@@ -512,6 +596,7 @@ export function runModFlowAnalysis(params: {
       buckets,
     },
     deltaBars,
+    confluences,
     events: recentEvents,
     walls: walls.slice(0, 8),
     orderBook,

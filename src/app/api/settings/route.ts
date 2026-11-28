@@ -54,6 +54,13 @@ const UpdateSettingsSchema = z.object({
       showOrderBlocks: z.boolean(),
       showEma: z.boolean(),
       candleStyle: z.enum(["candles", "hollow"]),
+      footprintConfluences: z.object({
+        deltaFlip: z.boolean(),
+        deltaSurge: z.boolean(),
+        deltaTransition: z.boolean(),
+        deltaAbsorption: z.boolean(),
+        cumulativeDelta: z.boolean(),
+      }).optional(),
     })
     .optional(),
   notificationPrefs: z

@@ -11,7 +11,7 @@ import {
 import { analyzeLiquidityAndStructure } from "./liquidity";
 import { calculateAdaptiveTakeProfit } from "./adaptive-tp";
 import { runModFlowAnalysis } from "./modflow";
-import type { AnalysisScenario, ChartAnalysisSnapshot, EngineScoreItem } from "@/db/schema";
+import { DEFAULT_FOOTPRINT_CONFLUENCES, type AnalysisScenario, type ChartAnalysisSnapshot, type EngineScoreItem, type FootprintConfluenceSettings } from "@/db/schema";
 
 export interface DecisionEngineOutput {
   symbol: string;
@@ -112,6 +112,7 @@ export async function runMultiEngineAnalysis(params: {
   confidenceThreshold?: number;
   minRiskReward?: number;
   includeChart?: boolean;
+  footprintConfluences?: FootprintConfluenceSettings;
 }): Promise<DecisionEngineOutput> {
   const inst = getInstrument(params.symbol ?? "XAUUSD");
   const symbol = inst.symbol;
@@ -208,6 +209,13 @@ export async function runMultiEngineAnalysis(params: {
     orderBook: bookRes,
   });
 
+  const enabledFootprint = { ...DEFAULT_FOOTPRINT_CONFLUENCES, ...(params.footprintConfluences ?? {}) };
+  const activeFootprintConfluences = modflow.confluences.filter((item) => enabledFootprint[item.key] && item.triggered);
+  const bullishFootprintCount = activeFootprintConfluences.filter((item) => item.direction === "BULLISH").length;
+  const bearishFootprintCount = activeFootprintConfluences.filter((item) => item.direction === "BEARISH").length;
+  // Correlated footprint readings are treated as one capped order-flow adjustment, never as independent engines.
+  const footprintAdjustment = Math.max(-8, Math.min(8, (bullishFootprintCount - bearishFootprintCount) * 4));
+
   // 4. Fundamental Intelligence Engine (Forex Factory gold-sensitive / high-impact window guard)
   const now = Date.now();
   const in2Hours = calRes.events.filter(
@@ -248,7 +256,8 @@ export async function runMultiEngineAnalysis(params: {
             : modflow.summary.cvdDivergence === "BEARISH_DIV"
               ? -24
               : 0) +
-          (currentPrice > modflow.volumeProfile.poc ? 14 : -14)
+          (currentPrice > modflow.volumeProfile.poc ? 14 : -14) +
+          footprintAdjustment
       )
     )
   );
@@ -301,6 +310,8 @@ export async function runMultiEngineAnalysis(params: {
         ...(modflow.orderBookStatus !== "UNAVAILABLE"
           ? [`L2 depth: ${modflow.summary.bidPressurePct.toFixed(1)}% bid vs ${modflow.summary.askPressurePct.toFixed(1)}% ask · spread ${modflow.summary.spread.toFixed(dec)}.`]
           : ["L2 order book excluded (unavailable on reference feed)."]),
+        ...activeFootprintConfluences.map((item) => `${item.label} ${item.direction.toLowerCase()} confluence (${item.strength}% proxy strength): ${item.evidence}`),
+        ...(activeFootprintConfluences.length === 0 ? ["No enabled footprint confluence currently triggered."] : []),
       ],
       dataStatus: modflow.status === "SIMULATED" ? "CACHED" : modflow.status,
     },
@@ -455,6 +466,7 @@ export async function runMultiEngineAnalysis(params: {
     }));
 
   const supportingEvidence: string[] = [
+    ...activeFootprintConfluences.map((item) => `${item.label}: ${item.direction} · ${item.evidence}`),
     `Multi-timeframe alignment: H1 ${h1Tech.bias}, M15 ${liqM15.trend}, M5 ${m5Tech.bias} (${alignedCount}/4 directional engines aligned).`,
     `ModFlow reading: ${modflow.summary.aggressiveBuyPct.toFixed(1)}% buy / ${modflow.summary.aggressiveSellPct.toFixed(1)}% sell pressure, CVD ${modflow.summary.cvdSlope.toLowerCase()}, ${modflow.summary.absorptionCount} absorption & ${modflow.summary.exhaustionCount} exhaustion bars.`,
     modflow.orderBookStatus !== "UNAVAILABLE"

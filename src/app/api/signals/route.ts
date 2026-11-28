@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     let observedPrice: number | null = null;
     if (input.mode === "ai") {
       const [risk] = await db.select().from(riskConfigs).where(eq(riskConfigs.userId, user.id)).limit(1);
-      const analysis = await runMultiEngineAnalysis({ symbol: instrument.symbol, confidenceThreshold: input.confidenceThreshold, minRiskReward: risk?.minRiskReward ?? 1.8 });
+      const analysis = await runMultiEngineAnalysis({ symbol: instrument.symbol, confidenceThreshold: input.confidenceThreshold, minRiskReward: risk?.minRiskReward ?? 1.8, footprintConfluences: user.chartPrefs?.footprintConfluences });
       if (analysis.dataStatus !== "LIVE" && analysis.dataStatus !== "DELAYED") return NextResponse.json({ error: "Verified market data is unavailable. No signal was published." }, { status: 503 });
       if (analysis.setupState !== "VALID" || analysis.direction === "NEUTRAL" || analysis.confirmationsCount < 2) {
         return NextResponse.json({ error: "No setup currently meets the publication rules." }, { status: 422 });

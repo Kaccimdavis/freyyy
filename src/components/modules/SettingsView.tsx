@@ -304,6 +304,14 @@ export function SettingsView({
     .slice(0, 2)
     .toUpperCase();
 
+  const footprintRows: Array<[keyof NonNullable<ChartPreferences["footprintConfluences"]>, string, string]> = [
+    ["deltaFlip", "Delta Flip", "Detect a sign reversal in estimated delta with matching price response."],
+    ["deltaSurge", "Delta Surge", "Detect expanding same-side estimated delta across three bars."],
+    ["deltaTransition", "Delta Transition", "Detect weakening prior pressure followed by opposing pressure."],
+    ["deltaAbsorption", "Delta Absorption", "Detect high-volume candle rejection patterns that may indicate absorption."],
+    ["cumulativeDelta", "Cumulative Delta", "Require estimated cumulative delta to agree with recent price direction."],
+  ];
+
   const legalRows = [
     { icon: <BookOpen size={16} />, title: "About Freyr", subtitle: "The app, its data sources and operator", href: "/legal/about" },
     { icon: <LifeBuoy className="h-4 w-4" />, title: "Help & support", subtitle: "Answers, contact and workspace help", href: "/help" },
@@ -497,6 +505,46 @@ export function SettingsView({
           )}
         </div>
       </div>
+
+      {/* Footprint intelligence */}
+      {chartPrefs && (
+        <div className="space-y-1.5">
+          <SectionLabel className="px-1">Footprint intelligence</SectionLabel>
+          <div className="freyr-row divide-y divide-ink/[0.06]">
+            {footprintRows.map(([key, title, description]) => (
+              <div key={key} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold text-ink">{title}</div>
+                  <div className="text-[10px] text-ink-secondary">{description}</div>
+                </div>
+                <Switch
+                  checked={Boolean(chartPrefs.footprintConfluences?.[key])}
+                  onChange={(value) => {
+                    const next: ChartPreferences = {
+                      ...chartPrefs,
+                      footprintConfluences: {
+                        deltaFlip: false,
+                        deltaSurge: false,
+                        deltaTransition: false,
+                        deltaAbsorption: false,
+                        cumulativeDelta: false,
+                        ...(chartPrefs.footprintConfluences ?? {}),
+                        [key]: value,
+                      },
+                    };
+                    setChartPrefs(next);
+                    patch({ chartPrefs: next }, "Footprint confluence settings saved.");
+                  }}
+                  label={title}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-[10px] leading-relaxed text-ink-secondary">
+            Current feed limitation: these readings are derived from candle OHLCV estimates, not exchange-classified bid/ask trade prints. They are proxy confluences, not verified footprint delta. All five controls are off by default.
+          </div>
+        </div>
+      )}
 
       {/* Chart preferences */}
       {chartPrefs && (
