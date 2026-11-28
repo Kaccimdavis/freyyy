@@ -21,6 +21,22 @@ export interface DashboardWidgetConfig {
   span?: "full" | "half" | "third";
 }
 
+export interface FootprintConfluenceSettings {
+  deltaFlip: boolean;
+  deltaSurge: boolean;
+  deltaTransition: boolean;
+  deltaAbsorption: boolean;
+  cumulativeDelta: boolean;
+}
+
+export const DEFAULT_FOOTPRINT_CONFLUENCES: FootprintConfluenceSettings = {
+  deltaFlip: false,
+  deltaSurge: false,
+  deltaTransition: false,
+  deltaAbsorption: false,
+  cumulativeDelta: false,
+};
+
 export interface ChartPreferences {
   showVolume: boolean;
   showSessions: boolean;
@@ -29,6 +45,7 @@ export interface ChartPreferences {
   showOrderBlocks: boolean;
   showEma: boolean;
   candleStyle: "candles" | "hollow";
+  footprintConfluences?: FootprintConfluenceSettings;
 }
 
 export interface NotificationPreferences {
