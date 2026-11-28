@@ -44,13 +44,18 @@ export async function GET(req: NextRequest) {
         cal = { ...secondary, events: secondary.events.filter((event) => isCalendarRelease(event.impact)) };
       }
     }
-    // Only return genuinely upcoming events. Apply this after all provider, cache,
-    // snapshot, and fallback paths so expired releases can never leak into the calendar.
+    // Gold calendar: only upcoming USD releases with Medium or High impact.
+    // Apply after every provider/cache/snapshot/fallback path so the API stays consistent.
     const now = Date.now();
     cal = {
       ...cal,
       events: cal.events
-        .filter((event) => Number.isFinite(event.timestamp) && event.timestamp > now)
+        .filter((event) =>
+          event.currency.trim().toUpperCase() === "USD" &&
+          (event.impact === "Medium" || event.impact === "High") &&
+          Number.isFinite(event.timestamp) &&
+          event.timestamp > now
+        )
         .sort((a, b) => a.timestamp - b.timestamp),
     };
     const highCount = cal.events.filter((e) => e.impact === "High").length;
