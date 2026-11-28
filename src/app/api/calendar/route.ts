@@ -44,12 +44,20 @@ export async function GET(req: NextRequest) {
         cal = { ...secondary, events: secondary.events.filter((event) => isCalendarRelease(event.impact)) };
       }
     }
+    // Only return genuinely upcoming events. Apply this after all provider, cache,
+    // snapshot, and fallback paths so expired releases can never leak into the calendar.
     const now = Date.now();
+    cal = {
+      ...cal,
+      events: cal.events
+        .filter((event) => Number.isFinite(event.timestamp) && event.timestamp > now)
+        .sort((a, b) => a.timestamp - b.timestamp),
+    };
     const highCount = cal.events.filter((e) => e.impact === "High").length;
     const goldCount = cal.events.filter((e) => e.isGoldSensitive).length;
     const nextHigh =
-      cal.events.find((e) => e.timestamp >= now && e.impact === "High" && e.isGoldSensitive) ??
-      cal.events.find((e) => e.timestamp >= now && e.impact === "High") ??
+      cal.events.find((e) => e.timestamp > now && e.impact === "High" && e.isGoldSensitive) ??
+      cal.events.find((e) => e.timestamp > now && e.impact === "High") ??
       null;
 
     return NextResponse.json({
