@@ -27,6 +27,13 @@ export const DEFAULT_CHART_PREFS: ChartPreferences = {
   showOrderBlocks: true,
   showEma: true,
   candleStyle: "candles",
+  footprintConfluences: {
+    deltaFlip: false,
+    deltaSurge: false,
+    deltaTransition: false,
+    deltaAbsorption: false,
+    cumulativeDelta: false,
+  },
 };
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
